@@ -1,4 +1,4 @@
-import { TILES, TILE_SIZE } from '../constants.js'
+import { TILES, TILE_SIZE, ENEMY_WIDTH, ENEMY_HEIGHT } from '../constants.js'
 
 // Mulberry32 seeded PRNG — fast, good distribution
 function mulberry32(seed) {
@@ -149,5 +149,27 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
   const spawnX = TILE_SIZE * 2
   const spawnY = (floorRows[2] - 3) * TILE_SIZE  // just above tunnel floor near start
 
-  return { map, floorRows, ceilRows, movingBoards, rockSpawns, spawnX, spawnY }
+  // --- Goal: a marker column near the right end ---
+  const goalCol = cols - 7
+
+  // --- Enemy spawns: patrol enemies placed on solid floor, away from start and goal ---
+  const enemyCount = 3 + Math.min(levelIndex, 3)
+  const enemySpawns = []
+  for (let i = 0; i < enemyCount; i++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const col = 15 + Math.floor(rand() * (goalCol - 20))
+      if (floorRows[col] === null) continue  // pit column
+      const tooClose = enemySpawns.some((e) => Math.abs(e.col - col) < 10)
+      if (tooClose) continue
+      const floorRow = floorRows[col]
+      enemySpawns.push({
+        col,
+        x: col * TILE_SIZE + Math.floor((TILE_SIZE - ENEMY_WIDTH) / 2),
+        y: floorRow * TILE_SIZE - ENEMY_HEIGHT,
+      })
+      break
+    }
+  }
+
+  return { map, floorRows, ceilRows, movingBoards, rockSpawns, enemySpawns, goalCol, spawnX, spawnY }
 }

@@ -1,4 +1,4 @@
-import { TILE_SIZE, TILES, PLAYER_STATES } from '../constants.js'
+import { TILE_SIZE, TILES, PLAYER_STATES, ENEMY_STATES } from '../constants.js'
 
 const TILE_COLORS = {
   [TILES.WALL]: '#5a4a3a',
@@ -93,6 +93,49 @@ function drawBoards(ctx, boards, cameraX) {
   }
 }
 
+function drawEnemies(ctx, enemies, cameraX) {
+  for (const enemy of enemies) {
+    if (enemy.state === ENEMY_STATES.DEAD) continue
+    const ex = Math.round(enemy.x - cameraX)
+    const ey = Math.round(enemy.y)
+
+    ctx.fillStyle = '#cc44cc'
+    ctx.fillRect(ex, ey, enemy.width, enemy.height)
+
+    // Eyes — indicate facing direction
+    ctx.fillStyle = '#220022'
+    const eyeY = ey + 7
+    if (enemy.facing === 1) {
+      ctx.fillRect(ex + enemy.width - 8, eyeY, 4, 4)
+    } else {
+      ctx.fillRect(ex + 4, eyeY, 4, 4)
+    }
+
+    // Stripes
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'
+    for (let i = 0; i < 2; i++) {
+      ctx.fillRect(ex + 4 + i * 7, ey + 14, 3, 10)
+    }
+  }
+}
+
+function drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight) {
+  const sx = goalX - cameraX
+  if (sx > canvasWidth + 32 || sx < -32) return
+
+  // Glowing pillar
+  const grad = ctx.createLinearGradient(sx, 0, sx + 16, 0)
+  grad.addColorStop(0, 'rgba(0,255,160,0)')
+  grad.addColorStop(0.5, 'rgba(0,255,160,0.55)')
+  grad.addColorStop(1, 'rgba(0,255,160,0)')
+  ctx.fillStyle = grad
+  ctx.fillRect(sx - 8, 0, 32, canvasHeight)
+
+  // Bright center stripe
+  ctx.fillStyle = 'rgba(0,255,160,0.9)'
+  ctx.fillRect(sx + 6, 0, 4, canvasHeight)
+}
+
 function drawRocks(ctx, rocks, cameraX) {
   for (const rock of rocks) {
     if (!rock.active) continue
@@ -110,7 +153,7 @@ function drawRocks(ctx, rocks, cameraX) {
   }
 }
 
-export function renderFrame(ctx, { tilemap, player, boards, rocks, cameraX, canvasWidth, canvasHeight }) {
+export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, goalX, cameraX, canvasWidth, canvasHeight }) {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
   // Cave background gradient
@@ -121,8 +164,10 @@ export function renderFrame(ctx, { tilemap, player, boards, rocks, cameraX, canv
   ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
   drawTiles(ctx, tilemap, cameraX, canvasWidth)
+  if (goalX != null) drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight)
   drawBoards(ctx, boards ?? [], cameraX)
   drawRocks(ctx, rocks ?? [], cameraX)
+  drawEnemies(ctx, enemies ?? [], cameraX)
   drawPlayer(ctx, player, cameraX)
 }
 

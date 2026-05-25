@@ -44,3 +44,12 @@ export const MAX_HEALTH = 4
 export const ATTACK_DURATION = 0.25  // seconds
 export const HURT_DURATION = 0.5     // seconds
 export const ATTACK_RANGE = 40       // px
+
+export const ENEMY_SPEED = 70        // px per second
+export const ENEMY_WIDTH = 26
+export const ENEMY_HEIGHT = 32
+export const ENEMY_STATES = {
+  PATROL: 'patrol',
+  DEAD: 'dead',
+}
+export const SCORE_PER_KILL = 10
