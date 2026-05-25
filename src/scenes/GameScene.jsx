@@ -1,8 +1,9 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
-import { CANVAS_WIDTH, CANVAS_HEIGHT, SCORE_PER_KILL } from '../constants.js'
+import { CANVAS_WIDTH, CANVAS_HEIGHT, SCORE_PER_KILL, FISH_SCORE, PLAYER_STATES } from '../constants.js'
 import { useInput } from '../hooks/useInput.js'
 import { useGameLoop } from '../hooks/useGameLoop.js'
 import { useLevel } from '../hooks/useLevel.js'
+import { useAudio } from '../hooks/useAudio.js'
 import { createPlayer, updatePlayer, hurtPlayer } from '../entities/Player.js'
 import { renderFrame, computeCameraX } from '../engine/renderer.js'
 import HUD from '../components/HUD.jsx'
@@ -38,21 +39,28 @@ const controlsHintStyle = {
   fontFamily: 'monospace',
 }
 
+const ATTACK_STATES = new Set([PLAYER_STATES.ATTACK_SCRATCH, PLAYER_STATES.ATTACK_BITE])
+
 export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGameOver }) {
   const getInput = useInput()
   const { getTilemapWithBoards, tilemap, updateObstacles, levelWidthPx, spawnX, spawnY, goalX } = useLevel(seed, levelIndex)
+  const play = useAudio()
 
   const canvasRef = useRef(null)
   const playerRef = useRef(createPlayer(spawnX, spawnY))
   const cameraXRef = useRef(0)
-  const obstaclesRef = useRef({ boards: [], rocks: [], enemies: [] })
+  const obstaclesRef = useRef({ boards: [], rocks: [], enemies: [], fish: [] })
+
+  // Track previous per-frame player state for edge-triggered audio
+  const prevStateRef = useRef(playerRef.current.state)
+  const prevOnGroundRef = useRef(playerRef.current.onGround)
 
   const [health, setHealth] = useState(playerRef.current.health)
   const [score, setScore] = useState(0)
+  const [fishCount, setFishCount] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [levelClear, setLevelClear] = useState(false)
 
-  // Advance to next level after brief delay when level is cleared
   useEffect(() => {
     if (!levelClear || !onLevelClear) return
     const t = setTimeout(() => onLevelClear(score), 1800)
@@ -63,25 +71,49 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
     if (gameOver || levelClear) return
 
     const input = getInput()
-
     const liveMap = getTilemapWithBoards()
     playerRef.current = updatePlayer(playerRef.current, input, liveMap, dt)
 
-    const { boards, rocks, enemies, playerHit, enemyPlayerHit, killedEnemies, goalReached } =
-      updateObstacles(playerRef.current, dt)
-    obstaclesRef.current = { boards, rocks, enemies }
+    const p = playerRef.current
+    const prevState = prevStateRef.current
+    const prevOnGround = prevOnGroundRef.current
+
+    // Edge-triggered audio
+    if (p.state === PLAYER_STATES.JUMP && prevState !== PLAYER_STATES.JUMP) play('jump')
+    if (p.onGround && !prevOnGround) play('land')
+    if (ATTACK_STATES.has(p.state) && !ATTACK_STATES.has(prevState)) play('attack')
+
+    prevStateRef.current = p.state
+    prevOnGroundRef.current = p.onGround
+
+    const { boards, rocks, enemies, fish, playerHit, enemyPlayerHit, killedEnemies, collectedFish, goalReached } =
+      updateObstacles(p, dt)
+    obstaclesRef.current = { boards, rocks, enemies, fish }
 
     if (killedEnemies > 0) {
+      play('kill')
       setScore((prev) => prev + killedEnemies * SCORE_PER_KILL)
+    }
+
+    if (collectedFish > 0) {
+      play('collect')
+      setFishCount((prev) => prev + collectedFish)
+      setScore((prev) => prev + collectedFish * FISH_SCORE)
     }
 
     if (playerHit || enemyPlayerHit) {
       playerRef.current = hurtPlayer(playerRef.current)
       setHealth(playerRef.current.health)
-      if (playerRef.current.health <= 0) setGameOver(true)
+      if (playerRef.current.health <= 0) {
+        play('gameOver')
+        setGameOver(true)
+      } else {
+        play('hurt')
+      }
     }
 
-    if (goalReached) {
+    if (goalReached && !levelClear) {
+      play('levelClear')
       setLevelClear(true)
     }
 
@@ -91,7 +123,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
       const next = playerRef.current.health
       return prev !== next ? next : prev
     })
-  }, [gameOver, levelClear, getInput, getTilemapWithBoards, updateObstacles, levelWidthPx])
+  }, [gameOver, levelClear, getInput, getTilemapWithBoards, updateObstacles, levelWidthPx, play])
 
   const render = useCallback(() => {
     const canvas = canvasRef.current
@@ -103,6 +135,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
       boards: obstaclesRef.current.boards,
       rocks: obstaclesRef.current.rocks,
       enemies: obstaclesRef.current.enemies,
+      fish: obstaclesRef.current.fish,
       goalX,
       cameraX: cameraXRef.current,
       canvasWidth: CANVAS_WIDTH,
@@ -120,7 +153,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
         height={CANVAS_HEIGHT}
         style={{ display: 'block', imageRendering: 'pixelated' }}
       />
-      <HUD health={health} score={score} />
+      <HUD health={health} score={score} fishCount={fishCount} />
       <div style={controlsHintStyle}>
         ←→ move · x jump · c scratch · z bite · v crouch
       </div>

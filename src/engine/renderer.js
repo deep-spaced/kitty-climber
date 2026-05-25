@@ -119,6 +119,31 @@ function drawEnemies(ctx, enemies, cameraX) {
   }
 }
 
+function drawFish(ctx, fish, cameraX) {
+  for (const f of fish) {
+    if (f.collected) continue
+    const fx = Math.round(f.x - cameraX)
+    const fy = Math.round(f.y)
+
+    // Tail fins (two small triangles faked with rects)
+    ctx.fillStyle = '#d07818'
+    ctx.fillRect(fx, fy, 4, 4)
+    ctx.fillRect(fx, fy + 8, 4, 4)
+
+    // Body
+    ctx.fillStyle = '#f0a030'
+    ctx.fillRect(fx + 4, fy + 2, 12, 8)
+
+    // Belly highlight
+    ctx.fillStyle = 'rgba(255,240,160,0.5)'
+    ctx.fillRect(fx + 6, fy + 3, 8, 3)
+
+    // Eye
+    ctx.fillStyle = '#1a1a1a'
+    ctx.fillRect(fx + 13, fy + 3, 2, 2)
+  }
+}
+
 function drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight) {
   const sx = goalX - cameraX
   if (sx > canvasWidth + 32 || sx < -32) return
@@ -153,7 +178,7 @@ function drawRocks(ctx, rocks, cameraX) {
   }
 }
 
-export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, goalX, cameraX, canvasWidth, canvasHeight }) {
+export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, fish, goalX, cameraX, canvasWidth, canvasHeight }) {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
 
   // Cave background gradient
@@ -167,6 +192,7 @@ export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, goal
   if (goalX != null) drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight)
   drawBoards(ctx, boards ?? [], cameraX)
   drawRocks(ctx, rocks ?? [], cameraX)
+  drawFish(ctx, fish ?? [], cameraX)
   drawEnemies(ctx, enemies ?? [], cameraX)
   drawPlayer(ctx, player, cameraX)
 }

@@ -33,7 +33,21 @@ const scoreStyle = {
   userSelect: 'none',
 }
 
-export default function HUD({ health, score }) {
+const fishDotStyle = {
+  marginLeft: 10,
+  fontSize: 14,
+  color: '#f0a030',
+  userSelect: 'none',
+}
+
+const fishCountStyle = {
+  marginLeft: 3,
+  fontSize: 14,
+  color: '#f0a030',
+  userSelect: 'none',
+}
+
+export default function HUD({ health, score, fishCount }) {
   return (
     <div style={containerStyle}>
       {Array.from({ length: MAX_HEALTH }, (_, i) => {
@@ -45,6 +59,12 @@ export default function HUD({ health, score }) {
         )
       })}
       {score != null && <span style={scoreStyle}>{score}</span>}
+      {fishCount != null && fishCount > 0 && (
+        <>
+          <span style={fishDotStyle}>◆</span>
+          <span style={fishCountStyle}>{fishCount}</span>
+        </>
+      )}
     </div>
   )
 }

@@ -53,3 +53,7 @@ export const ENEMY_STATES = {
   DEAD: 'dead',
 }
 export const SCORE_PER_KILL = 10
+
+export const FISH_WIDTH = 16
+export const FISH_HEIGHT = 12
+export const FISH_SCORE = 5

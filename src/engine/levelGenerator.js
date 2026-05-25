@@ -1,4 +1,4 @@
-import { TILES, TILE_SIZE, ENEMY_WIDTH, ENEMY_HEIGHT } from '../constants.js'
+import { TILES, TILE_SIZE, ENEMY_WIDTH, ENEMY_HEIGHT, FISH_WIDTH, FISH_HEIGHT } from '../constants.js'
 
 // Mulberry32 seeded PRNG — fast, good distribution
 function mulberry32(seed) {
@@ -171,5 +171,30 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     }
   }
 
-  return { map, floorRows, ceilRows, movingBoards, rockSpawns, enemySpawns, goalCol, spawnX, spawnY }
+  // --- Fish collectibles: scattered mid-tunnel at varying heights ---
+  const fishCount = 6 + levelIndex
+  const fishSpawns = []
+  for (let i = 0; i < fishCount; i++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const col = 8 + Math.floor(rand() * (goalCol - 12))
+      if (floorRows[col] === null) continue  // pit column
+      const ceilR = ceilRows[col]
+      const floorR = floorRows[col]
+      const tunnelInterior = floorR - ceilR - 2
+      if (tunnelInterior < 2) continue
+      const row = ceilR + 1 + Math.floor(rand() * tunnelInterior)
+      const tooClose = fishSpawns.some((f) => Math.abs(f.col - col) < 5)
+      if (tooClose) continue
+      fishSpawns.push({
+        col,
+        x: col * TILE_SIZE + Math.floor((TILE_SIZE - FISH_WIDTH) / 2),
+        y: row * TILE_SIZE + Math.floor((TILE_SIZE - FISH_HEIGHT) / 2),
+        width: FISH_WIDTH,
+        height: FISH_HEIGHT,
+      })
+      break
+    }
+  }
+
+  return { map, floorRows, ceilRows, movingBoards, rockSpawns, enemySpawns, fishSpawns, goalCol, spawnX, spawnY }
 }
