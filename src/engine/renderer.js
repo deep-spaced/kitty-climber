@@ -18,17 +18,10 @@ const PLAYER_COLOR = {
   [PLAYER_STATES.HURT]: '#ff2200',
 }
 
-export function renderFrame(ctx, { tilemap, player, cameraX, canvasWidth, canvasHeight }) {
-  ctx.clearRect(0, 0, canvasWidth, canvasHeight)
-
-  // Sky background
-  ctx.fillStyle = '#1a1a2e'
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
-
+function drawTiles(ctx, tilemap, cameraX, canvasWidth) {
   const startCol = Math.floor(cameraX / TILE_SIZE)
   const endCol = startCol + Math.ceil(canvasWidth / TILE_SIZE) + 1
 
-  // Tiles
   for (let row = 0; row < tilemap.length; row++) {
     for (let col = startCol; col < endCol; col++) {
       if (col < 0 || col >= tilemap[0].length) continue
@@ -41,18 +34,21 @@ export function renderFrame(ctx, { tilemap, player, cameraX, canvasWidth, canvas
       ctx.fillStyle = TILE_COLORS[tile] ?? '#888'
       ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE)
 
-      // Subtle grid line
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)'
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)'
       ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE)
     }
   }
+}
 
-  // Player
+function drawPlayer(ctx, player, cameraX) {
   const px = Math.round(player.x - cameraX)
   const py = Math.round(player.y)
   const color = PLAYER_COLOR[player.state] ?? '#e8a87c'
 
-  ctx.fillStyle = color
+  // Flash white when hurt
+  ctx.fillStyle = player.state === PLAYER_STATES.HURT
+    ? (Math.floor(Date.now() / 80) % 2 === 0 ? '#ffffff' : color)
+    : color
   ctx.fillRect(px, py, player.width, player.height)
 
   // Eyes — indicate facing direction
@@ -70,13 +66,64 @@ export function renderFrame(ctx, { tilemap, player, cameraX, canvasWidth, canvas
     ctx.fillRect(px + 4 + i * 7, py + 16, 4, 12)
   }
 
-  // Attack hitbox debug overlay
+  // Attack hitbox indicator
   if (player.state === PLAYER_STATES.ATTACK_SCRATCH || player.state === PLAYER_STATES.ATTACK_BITE) {
     const reach = 36
     const hbX = player.facing === 1 ? px + player.width : px - reach
     ctx.fillStyle = 'rgba(255,100,0,0.25)'
     ctx.fillRect(hbX, py + 4, reach, player.height - 8)
   }
+}
+
+function drawBoards(ctx, boards, cameraX) {
+  for (const board of boards) {
+    const sx = Math.round(board.x - cameraX)
+    const sy = Math.round(board.y)
+    // Board body
+    ctx.fillStyle = '#b8895a'
+    ctx.fillRect(sx, sy, board.width, board.height)
+    // Wood grain lines
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'
+    for (let i = 0; i < board.width; i += 12) {
+      ctx.fillRect(sx + i, sy, 2, board.height)
+    }
+    // Top highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.2)'
+    ctx.fillRect(sx, sy, board.width, 2)
+  }
+}
+
+function drawRocks(ctx, rocks, cameraX) {
+  for (const rock of rocks) {
+    if (!rock.active) continue
+    const sx = Math.round(rock.x - cameraX)
+    const sy = Math.round(rock.y)
+    // Rock body
+    ctx.fillStyle = '#888070'
+    ctx.fillRect(sx, sy, rock.width, rock.height)
+    // Slight highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'
+    ctx.fillRect(sx + 2, sy + 2, rock.width - 6, 4)
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'
+    ctx.fillRect(sx + 2, sy + rock.height - 5, rock.width - 4, 4)
+  }
+}
+
+export function renderFrame(ctx, { tilemap, player, boards, rocks, cameraX, canvasWidth, canvasHeight }) {
+  ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+
+  // Cave background gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, canvasHeight)
+  grad.addColorStop(0, '#0d0820')
+  grad.addColorStop(1, '#1a1008')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+
+  drawTiles(ctx, tilemap, cameraX, canvasWidth)
+  drawBoards(ctx, boards ?? [], cameraX)
+  drawRocks(ctx, rocks ?? [], cameraX)
+  drawPlayer(ctx, player, cameraX)
 }
 
 export function computeCameraX(playerX, levelWidthPx, canvasWidth) {
