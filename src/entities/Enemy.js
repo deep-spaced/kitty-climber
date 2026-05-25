@@ -1,4 +1,4 @@
-import { ENEMY_SPEED, ENEMY_WIDTH, ENEMY_HEIGHT, ENEMY_STATES, TILE_SIZE, TILES, GRAVITY, MAX_FALL_SPEED } from '../constants.js'
+import { ENEMY_SPEED, ENEMY_WIDTH, ENEMY_HEIGHT, ENEMY_STATES, ENEMY_DYING_DURATION, TILE_SIZE, TILES, GRAVITY, MAX_FALL_SPEED } from '../constants.js'
 
 function isSolid(tile) {
   return tile != null && tile !== TILES.EMPTY
@@ -19,6 +19,11 @@ export function createEnemy(x, y) {
 
 export function updateEnemy(enemy, tilemap, dt) {
   if (enemy.state === ENEMY_STATES.DEAD) return enemy
+
+  if (enemy.state === ENEMY_STATES.DYING) {
+    const dyingTimer = Math.max(0, enemy.dyingTimer - dt)
+    return { ...enemy, dyingTimer, state: dyingTimer === 0 ? ENEMY_STATES.DEAD : ENEMY_STATES.DYING }
+  }
 
   const rows = tilemap.length
   const cols = tilemap[0].length
@@ -72,5 +77,5 @@ export function updateEnemy(enemy, tilemap, dt) {
 }
 
 export function hurtEnemy(enemy) {
-  return { ...enemy, state: ENEMY_STATES.DEAD }
+  return { ...enemy, state: ENEMY_STATES.DYING, dyingTimer: ENEMY_DYING_DURATION }
 }

@@ -50,8 +50,10 @@ export const ENEMY_WIDTH = 26
 export const ENEMY_HEIGHT = 32
 export const ENEMY_STATES = {
   PATROL: 'patrol',
+  DYING: 'dying',
   DEAD: 'dead',
 }
+export const ENEMY_DYING_DURATION = 0.3  // seconds
 export const SCORE_PER_KILL = 10
 
 export const FISH_WIDTH = 16

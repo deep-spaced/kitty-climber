@@ -6,6 +6,7 @@ import { useLevel } from '../hooks/useLevel.js'
 import { useAudio } from '../hooks/useAudio.js'
 import { createPlayer, updatePlayer, hurtPlayer } from '../entities/Player.js'
 import { renderFrame, computeCameraX } from '../engine/renderer.js'
+import { emitHit, emitDeath, emitCollect, emitLand, updateParticles } from '../engine/particles.js'
 import HUD from '../components/HUD.jsx'
 
 const overlayStyle = {
@@ -50,8 +51,8 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
   const playerRef = useRef(createPlayer(spawnX, spawnY))
   const cameraXRef = useRef(0)
   const obstaclesRef = useRef({ boards: [], rocks: [], enemies: [], fish: [] })
+  const particlesRef = useRef([])
 
-  // Track previous per-frame player state for edge-triggered audio
   const prevStateRef = useRef(playerRef.current.state)
   const prevOnGroundRef = useRef(playerRef.current.onGround)
 
@@ -78,9 +79,12 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
     const prevState = prevStateRef.current
     const prevOnGround = prevOnGroundRef.current
 
-    // Edge-triggered audio
+    // Edge-triggered audio + land particles
     if (p.state === PLAYER_STATES.JUMP && prevState !== PLAYER_STATES.JUMP) play('jump')
-    if (p.onGround && !prevOnGround) play('land')
+    if (p.onGround && !prevOnGround) {
+      play('land')
+      particlesRef.current = [...particlesRef.current, ...emitLand(p.x + p.width / 2, p.y + p.height)]
+    }
     if (ATTACK_STATES.has(p.state) && !ATTACK_STATES.has(prevState)) play('attack')
 
     prevStateRef.current = p.state
@@ -90,19 +94,26 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
       updateObstacles(p, dt)
     obstaclesRef.current = { boards, rocks, enemies, fish }
 
-    if (killedEnemies > 0) {
+    if (killedEnemies.length > 0) {
       play('kill')
-      setScore((prev) => prev + killedEnemies * SCORE_PER_KILL)
+      setScore((prev) => prev + killedEnemies.length * SCORE_PER_KILL)
+      for (const pos of killedEnemies) {
+        particlesRef.current = [...particlesRef.current, ...emitDeath(pos.x, pos.y)]
+      }
     }
 
-    if (collectedFish > 0) {
+    if (collectedFish.length > 0) {
       play('collect')
-      setFishCount((prev) => prev + collectedFish)
-      setScore((prev) => prev + collectedFish * FISH_SCORE)
+      setFishCount((prev) => prev + collectedFish.length)
+      setScore((prev) => prev + collectedFish.length * FISH_SCORE)
+      for (const pos of collectedFish) {
+        particlesRef.current = [...particlesRef.current, ...emitCollect(pos.x, pos.y)]
+      }
     }
 
     if (playerHit || enemyPlayerHit) {
-      playerRef.current = hurtPlayer(playerRef.current)
+      particlesRef.current = [...particlesRef.current, ...emitHit(p.x + p.width / 2, p.y + p.height / 2)]
+      playerRef.current = hurtPlayer(p)
       setHealth(playerRef.current.health)
       if (playerRef.current.health <= 0) {
         play('gameOver')
@@ -116,6 +127,8 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
       play('levelClear')
       setLevelClear(true)
     }
+
+    particlesRef.current = updateParticles(particlesRef.current, dt)
 
     cameraXRef.current = computeCameraX(playerRef.current.x, levelWidthPx, CANVAS_WIDTH)
 
@@ -136,6 +149,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
       rocks: obstaclesRef.current.rocks,
       enemies: obstaclesRef.current.enemies,
       fish: obstaclesRef.current.fish,
+      particles: particlesRef.current,
       goalX,
       cameraX: cameraXRef.current,
       canvasWidth: CANVAS_WIDTH,

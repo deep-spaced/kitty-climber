@@ -71,28 +71,30 @@ export function useLevel(seed = 1, levelIndex = 0) {
 
     // Update enemies and resolve combat
     const attackHitbox = getAttackHitbox(player)
-    let killedEnemies = 0
+    const killedEnemies = []  // array of {x, y} world-space centres
     enemiesRef.current = enemiesRef.current.map((enemy) => {
       if (enemy.state === ENEMY_STATES.DEAD) return enemy
+      // DYING enemies just tick their timer — no patrol, no contact
+      if (enemy.state === ENEMY_STATES.DYING) return updateEnemy(enemy, map, dt)
       const moved = updateEnemy(enemy, map, dt)
       if (attackHitbox && aabbOverlap(attackHitbox, moved)) {
-        killedEnemies++
+        killedEnemies.push({ x: moved.x + moved.width / 2, y: moved.y + moved.height / 2 })
         return hurtEnemy(moved)
       }
       return moved
     })
 
-    // Enemy body contact deals damage to player (only living enemies)
+    // Enemy body contact deals damage to player (PATROL only)
     const enemyPlayerHit = enemiesRef.current.some(
-      (e) => e.state !== ENEMY_STATES.DEAD && aabbOverlap(e, player)
+      (e) => e.state === ENEMY_STATES.PATROL && aabbOverlap(e, player)
     )
 
-    // Fish collection
-    let collectedFish = 0
+    // Fish collection — track positions for particles
+    const collectedFish = []  // array of {x, y} world-space centres
     fishRef.current = fishRef.current.map((f) => {
       if (f.collected) return f
       if (aabbOverlap(f, player)) {
-        collectedFish++
+        collectedFish.push({ x: f.x + f.width / 2, y: f.y + f.height / 2 })
         return { ...f, collected: true }
       }
       return f

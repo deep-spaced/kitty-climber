@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createEnemy, updateEnemy, hurtEnemy } from '../../src/entities/Enemy.js'
-import { TILES, TILE_SIZE, ENEMY_SPEED, ENEMY_WIDTH, ENEMY_HEIGHT, ENEMY_STATES } from '../../src/constants.js'
+import { TILES, TILE_SIZE, ENEMY_SPEED, ENEMY_WIDTH, ENEMY_HEIGHT, ENEMY_STATES, ENEMY_DYING_DURATION } from '../../src/constants.js'
 
 // 10×20 map: ceiling row 0, floor row 9, empty in between
 function makeMap(rows = 10, cols = 20) {
@@ -47,10 +47,10 @@ describe('updateEnemy — patrol movement', () => {
     expect(moved.x).toBeGreaterThan(x0)
   })
 
-  it('does not move when already dead', () => {
+  it('does not move horizontally when dying or dead', () => {
     const map = makeMap()
     let e = onFloor(map)
-    e = hurtEnemy(e)
+    e = hurtEnemy(e)                    // now DYING
     const x0 = e.x
     const result = updateEnemy(e, map, DT)
     expect(result.x).toBe(x0)
@@ -114,16 +114,30 @@ describe('updateEnemy — patrol movement', () => {
 })
 
 describe('hurtEnemy', () => {
-  it('sets state to DEAD', () => {
+  it('sets state to DYING (not immediately DEAD)', () => {
     const e = createEnemy(100, 200)
-    const dead = hurtEnemy(e)
-    expect(dead.state).toBe(ENEMY_STATES.DEAD)
+    const dying = hurtEnemy(e)
+    expect(dying.state).toBe(ENEMY_STATES.DYING)
+    expect(dying.dyingTimer).toBeCloseTo(ENEMY_DYING_DURATION)
   })
 
-  it('preserves position when killed', () => {
+  it('preserves position when hurt', () => {
     const e = createEnemy(150, 300)
-    const dead = hurtEnemy(e)
-    expect(dead.x).toBe(e.x)
-    expect(dead.y).toBe(e.y)
+    const dying = hurtEnemy(e)
+    expect(dying.x).toBe(e.x)
+    expect(dying.y).toBe(e.y)
+  })
+
+  it('transitions from DYING to DEAD after timer expires', () => {
+    const map = makeMap()
+    let e = onFloor(map)
+    e = hurtEnemy(e)
+    expect(e.state).toBe(ENEMY_STATES.DYING)
+    // Simulate past the dying duration
+    const steps = Math.ceil(ENEMY_DYING_DURATION / DT) + 5
+    for (let i = 0; i < steps; i++) {
+      e = updateEnemy(e, map, DT)
+    }
+    expect(e.state).toBe(ENEMY_STATES.DEAD)
   })
 })
