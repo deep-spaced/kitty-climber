@@ -1,4 +1,11 @@
-import { TILES, TILE_SIZE, ENEMY_WIDTH, ENEMY_HEIGHT, FISH_WIDTH, FISH_HEIGHT, TREAT_WIDTH, TREAT_HEIGHT } from '../constants.js'
+import {
+  TILES, TILE_SIZE,
+  ENEMY_WIDTH, ENEMY_HEIGHT,
+  FISH_WIDTH, FISH_HEIGHT,
+  TREAT_WIDTH, TREAT_HEIGHT,
+  BOSS_ENEMY_WIDTH, BOSS_ENEMY_HEIGHT,
+  CAGE_WIDTH, CAGE_HEIGHT,
+} from '../constants.js'
 
 // Mulberry32 seeded PRNG — fast, good distribution
 function mulberry32(seed) {
@@ -32,20 +39,23 @@ function smoothArray(arr, passes = 3) {
  *   ceilRows     — top tunnel row per column
  *   movingBoards — array of board descriptors { col, row, width, amplitude, speed, phase }
  *   rockSpawns   — array of { col, row } ceiling positions where rocks can drop
+ *   enemySpawns  — regular patrol enemies
+ *   bossSpawn    — { x, y } for the boss guard, or null
+ *   cageSpawn    — { x, y, width, height } for the end-of-level kitten cage
  *   spawnX/Y     — player start in px
  */
 export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = {}) {
   const rand = mulberry32(seed)
 
-  const TUNNEL_HEIGHT = 7  // clear tiles between ceiling and floor tiles
-  const HALF = Math.floor(TUNNEL_HEIGHT / 2)
+  const TUNNEL_HEIGHT = 9  // clear tiles between ceiling and floor tiles
+  const HALF = Math.floor(TUNNEL_HEIGHT / 2)  // 4
 
   // --- Tunnel center-line: random walk, then smooth ---
   let center = Math.floor(rows / 2)
   const rawCenters = [center]
   for (let c = 1; c < cols; c++) {
     const r = rand()
-    if (c > 4 && c < cols - 4) {          // keep ends straight
+    if (c > 4 && c < cols - 4) {
       if (r < 0.25) center = Math.max(HALF + 2, center - 1)
       else if (r < 0.5) center = Math.min(rows - HALF - 3, center + 1)
     }
@@ -56,7 +66,7 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
   // --- Carve tunnel ---
   const map = Array.from({ length: rows }, () => Array(cols).fill(TILES.WALL))
   const floorRows = []
-  const ceilRows = []
+  const ceilRows  = []
 
   for (let c = 0; c < cols; c++) {
     const top = centers[c] - HALF
@@ -77,15 +87,23 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     map[r][cols - 1] = TILES.WALL
   }
 
-  // --- Platforms: 4–6 ledges scattered through the tunnel interior ---
+  // --- Platforms: 4–6 ledges, with guaranteed headroom on both sides ---
+  // Player height = 40px = 1.25 tiles. Need ≥2 clear tiles above AND below.
+  // With TUNNEL_HEIGHT=9: floorR - ceilR = 8, valid range is ceilR+3 … ceilR+5.
   const platformCount = 4 + Math.floor(rand() * 3)
   const platforms = []
   for (let i = 0; i < platformCount; i++) {
     const col = 8 + Math.floor(rand() * (cols - 24))
-    const ceilR = ceilRows[col]
+    const ceilR  = ceilRows[col]
     const floorR = floorRows[col]
-    const midY = ceilR + 2 + Math.floor(rand() * (floorR - ceilR - 4))
-    const width = 4 + Math.floor(rand() * 5)  // 4–8 tiles wide
+
+    // Enforce clearance: 2+ EMPTY tiles above platform, 2+ EMPTY tiles below
+    const midYMin = ceilR + 3
+    const midYMax = floorR - 3
+    if (midYMax < midYMin) continue  // tunnel too narrow — skip
+
+    const midY = midYMin + Math.floor(rand() * (midYMax - midYMin + 1))
+    const width = 4 + Math.floor(rand() * 5)
 
     let overlaps = false
     for (const p of platforms) {
@@ -94,9 +112,15 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     if (!overlaps) {
       platforms.push({ col, row: midY, width })
       for (let dc = 0; dc < width && col + dc < cols - 1; dc++) {
-        if (map[midY][col + dc] === TILES.EMPTY) {
-          map[midY][col + dc] = TILES.PLATFORM
-        }
+        const pc = col + dc
+        if (map[midY][pc] !== TILES.EMPTY) continue
+        // Re-check clearance at this specific column (ceiling varies along the tunnel)
+        const pcCeilR  = ceilRows[pc]
+        const pcFloorR = floorRows[pc]
+        if (pcFloorR === null) continue
+        if (midY - pcCeilR < 3) continue   // < 2 clear tiles above
+        if (pcFloorR - midY < 3) continue  // < 2 clear tiles below
+        map[midY][pc] = TILES.PLATFORM
       }
     }
   }
@@ -106,7 +130,7 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
   const pits = []
   for (let i = 0; i < pitCount; i++) {
     const col = 12 + Math.floor(rand() * (cols - 30))
-    const width = 3 + Math.floor(rand() * 3)  // 3–5 tile gap
+    const width = 3 + Math.floor(rand() * 3)
 
     let overlaps = false
     for (const p of pits) {
@@ -117,8 +141,8 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
       for (let dc = 0; dc < width && col + dc < cols - 1; dc++) {
         const r = floorRows[col + dc]
         if (r >= 0 && r < rows) {
-          map[r][col + dc] = TILES.WALL  // pit bottom is solid wall below
-          floorRows[col + dc] = null     // mark as pit
+          map[r][col + dc] = TILES.WALL
+          floorRows[col + dc] = null
         }
       }
     }
@@ -131,14 +155,14 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     return {
       col,
       row,
-      width: pit.width + 1,         // board slightly wider than pit
+      width: pit.width + 1,
       amplitude: (pit.width * TILE_SIZE) / 2,
-      speed: 1.2 + rand() * 0.8,    // radians/sec
+      speed: 1.2 + rand() * 0.8,
       phase: rand() * Math.PI * 2,
     }
   })
 
-  // --- Rock spawns: random ceiling positions away from start ---
+  // --- Rock spawns ---
   const rockSpawnCount = 5 + levelIndex * 2
   const rockSpawns = []
   for (let i = 0; i < rockSpawnCount; i++) {
@@ -147,18 +171,35 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
   }
 
   const spawnX = TILE_SIZE * 2
-  const spawnY = (floorRows[2] - 3) * TILE_SIZE  // just above tunnel floor near start
+  const spawnY = (floorRows[2] - 3) * TILE_SIZE
 
-  // --- Goal: a marker column near the right end ---
+  // --- Goal column and cage ---
   const goalCol = cols - 7
 
-  // --- Enemy spawns: patrol enemies placed on solid floor, away from start and goal ---
+  const cageFloorRow = floorRows[goalCol] ?? floorRows[goalCol - 1] ?? floorRows[goalCol + 1]
+  const cageSpawn = {
+    x: goalCol * TILE_SIZE + Math.floor((TILE_SIZE - CAGE_WIDTH) / 2),
+    y: cageFloorRow * TILE_SIZE - CAGE_HEIGHT,
+    width: CAGE_WIDTH,
+    height: CAGE_HEIGHT,
+  }
+
+  // --- Boss spawn: large guard enemy placed before the cage ---
+  const bossCol = goalCol - 12
+  const bossFloorRow = floorRows[bossCol] ?? floorRows[bossCol - 1] ?? floorRows[bossCol + 1]
+  const bossSpawn = bossFloorRow !== null ? {
+    col: bossCol,
+    x: bossCol * TILE_SIZE + Math.floor((TILE_SIZE - BOSS_ENEMY_WIDTH) / 2),
+    y: bossFloorRow * TILE_SIZE - BOSS_ENEMY_HEIGHT,
+  } : null
+
+  // --- Regular enemy spawns: patrol enemies on floor, away from start/goal/boss ---
   const enemyCount = 3 + Math.min(levelIndex, 3)
   const enemySpawns = []
   for (let i = 0; i < enemyCount; i++) {
     for (let attempt = 0; attempt < 20; attempt++) {
-      const col = 15 + Math.floor(rand() * (goalCol - 20))
-      if (floorRows[col] === null) continue  // pit column
+      const col = 15 + Math.floor(rand() * (goalCol - 25))
+      if (floorRows[col] === null) continue
       const tooClose = enemySpawns.some((e) => Math.abs(e.col - col) < 10)
       if (tooClose) continue
       const floorRow = floorRows[col]
@@ -171,14 +212,14 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     }
   }
 
-  // --- Fish collectibles: scattered mid-tunnel at varying heights ---
+  // --- Fish collectibles ---
   const fishCount = 6 + levelIndex
   const fishSpawns = []
   for (let i = 0; i < fishCount; i++) {
     for (let attempt = 0; attempt < 20; attempt++) {
       const col = 8 + Math.floor(rand() * (goalCol - 12))
-      if (floorRows[col] === null) continue  // pit column
-      const ceilR = ceilRows[col]
+      if (floorRows[col] === null) continue
+      const ceilR  = ceilRows[col]
       const floorR = floorRows[col]
       const tunnelInterior = floorR - ceilR - 2
       if (tunnelInterior < 2) continue
@@ -196,8 +237,8 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     }
   }
 
-  // --- Treat spawns: health pickups on solid floor, spaced from fish and each other ---
-  const treatCount = 2 + Math.floor(rand() * 2)  // 2–3 per level
+  // --- Treat spawns ---
+  const treatCount = 2 + Math.floor(rand() * 2)
   const treatSpawns = []
   for (let i = 0; i < treatCount; i++) {
     for (let attempt = 0; attempt < 20; attempt++) {
@@ -218,5 +259,11 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     }
   }
 
-  return { map, floorRows, ceilRows, movingBoards, rockSpawns, enemySpawns, fishSpawns, treatSpawns, goalCol, spawnX, spawnY }
+  return {
+    map, floorRows, ceilRows,
+    movingBoards, rockSpawns,
+    enemySpawns, bossSpawn, cageSpawn,
+    fishSpawns, treatSpawns,
+    spawnX, spawnY,
+  }
 }

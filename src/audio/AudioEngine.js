@@ -79,5 +79,23 @@ export function createAudioEngine(ctx) {
 
     // Gentle ascending C-E-G-A shimmer
     heal()       { play(() => chord(ctx, 'sine', [523, 659, 784, 880], 0.16, 0.07, 0.18)) },
+
+    // Metallic cage clang
+    cage() {
+      play(() => {
+        const o = ctx.createOscillator()
+        const g = ctx.createGain()
+        const t = ctx.currentTime
+        o.type = 'sawtooth'
+        o.frequency.setValueAtTime(220, t)
+        o.frequency.exponentialRampToValueAtTime(70, t + 0.18)
+        g.gain.setValueAtTime(0.28, t)
+        g.gain.linearRampToValueAtTime(0.001, t + 0.22)
+        o.connect(g)
+        g.connect(ctx.destination)
+        o.start(t)
+        o.stop(t + 0.22)
+      })
+    },
   }
 }

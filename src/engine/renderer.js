@@ -1,10 +1,13 @@
-import { TILE_SIZE, TILES, PLAYER_STATES, ENEMY_STATES, ENEMY_DYING_DURATION } from '../constants.js'
+import {
+  TILE_SIZE, TILES, PLAYER_STATES, ENEMY_STATES, ENEMY_DYING_DURATION,
+  BOSS_ENEMY_HEALTH, CAGE_HEALTH,
+} from '../constants.js'
 import { drawParticles } from './particles.js'
 
 const TILE_COLORS = {
-  [TILES.WALL]: '#5a4a3a',
-  [TILES.FLOOR]: '#7a6a5a',
-  [TILES.CEILING]: '#4a3a2a',
+  [TILES.WALL]:     '#5a4a3a',
+  [TILES.FLOOR]:    '#7a6a5a',
+  [TILES.CEILING]:  '#4a3a2a',
   [TILES.PLATFORM]: '#8a7a6a',
 }
 
@@ -19,7 +22,6 @@ const PLAYER_COLOR = {
   [PLAYER_STATES.HURT]:          '#ff2200',
 }
 
-// Two-layer parallax cave decorations — purely cosmetic, no level data needed
 function drawBackground(ctx, cameraX, canvasWidth, canvasHeight) {
   const grad = ctx.createLinearGradient(0, 0, 0, canvasHeight)
   grad.addColorStop(0, '#0d0820')
@@ -27,7 +29,6 @@ function drawBackground(ctx, cameraX, canvasWidth, canvasHeight) {
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-  // Far layer: stalactite/stalagmite silhouettes (8% parallax)
   const W1 = canvasWidth + 160
   const farOff = cameraX * 0.08
   ctx.fillStyle = 'rgba(255,255,255,0.025)'
@@ -38,7 +39,6 @@ function drawBackground(ctx, cameraX, canvasWidth, canvasHeight) {
     ctx.fillRect(Math.round(x + 22), canvasHeight - Math.round(h * 0.55), 4, Math.round(h * 0.55))
   }
 
-  // Mid layer: vertical wall striations (22% parallax)
   const W2 = canvasWidth + 240
   const midOff = cameraX * 0.22
   ctx.fillStyle = 'rgba(255,255,255,0.012)'
@@ -63,7 +63,6 @@ function drawTiles(ctx, tilemap, cameraX, canvasWidth) {
 
       ctx.fillStyle = TILE_COLORS[tile] ?? '#888'
       ctx.fillRect(sx, sy, TILE_SIZE, TILE_SIZE)
-
       ctx.strokeStyle = 'rgba(0,0,0,0.18)'
       ctx.strokeRect(sx, sy, TILE_SIZE, TILE_SIZE)
     }
@@ -81,31 +80,24 @@ function drawPlayer(ctx, player, cameraX) {
     ? (Math.floor(Date.now() / 80) % 2 === 0 ? '#ffffff' : baseColor)
     : baseColor
 
-  // --- Tail (behind body, opposite facing) ---
-  const ts = facing === 1 ? -1 : 1   // tail side
+  const ts = facing === 1 ? -1 : 1
   const tbx = facing === 1 ? px : px + width
   ctx.fillStyle = bodyColor
   ctx.fillRect(tbx + ts * 4, py + height - 14, 4, 8)
   ctx.fillRect(tbx + ts * 7, py + height - 20, 4, 6)
 
-  // --- Body ---
   ctx.fillStyle = bodyColor
   ctx.fillRect(px, py + 8, width, height - 8)
-
-  // --- Head ---
   ctx.fillRect(px + 2, py + 1, width - 4, 12)
 
-  // --- Ears (cosmetic — sit above hitbox top) ---
   ctx.fillRect(px + 2,         py - 5, 5, 6)
   ctx.fillRect(px + width - 7, py - 5, 5, 6)
   ctx.fillRect(px + 3,         py - 8, 3, 3)
   ctx.fillRect(px + width - 6, py - 8, 3, 3)
-  // Inner ear
   ctx.fillStyle = '#e06090'
   ctx.fillRect(px + 4,         py - 4, 2, 4)
   ctx.fillRect(px + width - 6, py - 4, 2, 4)
 
-  // --- Eye ---
   ctx.fillStyle = '#1a1a1a'
   const eyeX = facing === 1 ? px + width - 10 : px + 5
   const eyeY = py + 4
@@ -113,17 +105,12 @@ function drawPlayer(ctx, player, cameraX) {
   ctx.fillStyle = '#fff'
   ctx.fillRect(eyeX + (facing === 1 ? 1 : 3), eyeY, 1, 1)
 
-  // --- Nose ---
   ctx.fillStyle = '#e06080'
   ctx.fillRect(eyeX + (facing === 1 ? -3 : 4), eyeY + 4, 3, 2)
 
-  // --- Tabby stripes ---
   ctx.fillStyle = 'rgba(0,0,0,0.18)'
-  for (let i = 0; i < 3; i++) {
-    ctx.fillRect(px + 4 + i * 7, py + 16, 3, 12)
-  }
+  for (let i = 0; i < 3; i++) ctx.fillRect(px + 4 + i * 7, py + 16, 3, 12)
 
-  // --- Legs (state-dependent animation) ---
   ctx.fillStyle = bodyColor
   if (state === PLAYER_STATES.RUN) {
     const f = Math.floor(Date.now() / 90) % 2
@@ -132,23 +119,19 @@ function drawPlayer(ctx, player, cameraX) {
     ctx.fillRect(px + 3,         py + height - fLen, 6, fLen)
     ctx.fillRect(px + width - 9, py + height - bLen, 6, bLen)
   } else if (state === PLAYER_STATES.JUMP) {
-    // Legs tucked
     ctx.fillRect(px + 3,         py + height - 5, 6, 5)
     ctx.fillRect(px + width - 9, py + height - 5, 6, 5)
   } else if (state === PLAYER_STATES.FALL) {
-    // Legs stretched down
     ctx.fillRect(px + 3,         py + height - 9, 5, 9)
     ctx.fillRect(px + width - 8, py + height - 9, 5, 9)
   } else if (state === PLAYER_STATES.CROUCH) {
-    ctx.fillRect(px + 2,         py + height - 4, 8, 4)
+    ctx.fillRect(px + 2,          py + height - 4, 8, 4)
     ctx.fillRect(px + width - 10, py + height - 4, 8, 4)
   } else {
-    // Idle / attack
     ctx.fillRect(px + 3,         py + height - 7, 6, 7)
     ctx.fillRect(px + width - 9, py + height - 7, 6, 7)
   }
 
-  // --- Attack claw marks ---
   if (state === PLAYER_STATES.ATTACK_SCRATCH || state === PLAYER_STATES.ATTACK_BITE) {
     const reach = 36
     const hbX = facing === 1 ? px + width : px - reach
@@ -158,6 +141,64 @@ function drawPlayer(ctx, player, cameraX) {
     for (let i = 0; i < 3; i++) {
       const cx = facing === 1 ? px + width + 2 + i * 5 : px - 4 - i * 5
       ctx.fillRect(cx, py + 6, 2, 10)
+    }
+  }
+}
+
+function drawSingleEnemy(ctx, enemy, ex, ey) {
+  const { width, height, facing, isBoss, health, hurtTimer, state } = enemy
+  const flash = (hurtTimer ?? 0) > 0 && Math.floor(Date.now() / 60) % 2 === 0
+  const baseColor = isBoss ? '#7a1a8a' : '#cc44cc'
+  const bodyColor = flash ? '#ffffff' : baseColor
+
+  ctx.fillStyle = bodyColor
+  ctx.fillRect(ex, ey, width, height)
+
+  // Eyes
+  ctx.fillStyle = '#220022'
+  const eyeOff = isBoss ? 11 : 8
+  const eyeW = isBoss ? 6 : 4
+  const eyeH = isBoss ? 5 : 4
+  const eyeY = ey + Math.round(height * 0.22)
+  if (facing === 1) {
+    ctx.fillRect(ex + width - eyeOff, eyeY, eyeW, eyeH)
+  } else {
+    ctx.fillRect(ex + eyeOff - eyeW, eyeY, eyeW, eyeH)
+  }
+
+  // Boss angry eyebrow
+  if (isBoss) {
+    ctx.fillStyle = '#440044'
+    if (facing === 1) {
+      ctx.fillRect(ex + width - eyeOff - 1, eyeY - 4, eyeW + 2, 2)
+    } else {
+      ctx.fillRect(ex + eyeOff - eyeW - 1, eyeY - 4, eyeW + 2, 2)
+    }
+  }
+
+  // Ears
+  const earW = isBoss ? 7 : 4
+  const earH = isBoss ? 8 : 5
+  ctx.fillStyle = bodyColor
+  ctx.fillRect(ex + 2,               ey - earH, earW,     earH)
+  ctx.fillRect(ex + width - earW - 2, ey - earH, earW,     earH)
+  ctx.fillStyle = isBoss ? '#ee88ff' : '#ff88ff'
+  ctx.fillRect(ex + 3,               ey - earH + 1, earW - 2, earH - 2)
+  ctx.fillRect(ex + width - earW - 1, ey - earH + 1, earW - 2, earH - 2)
+
+  // Stripes
+  ctx.fillStyle = 'rgba(0,0,0,0.2)'
+  const stripes = isBoss ? 3 : 2
+  for (let i = 0; i < stripes; i++) {
+    ctx.fillRect(ex + 4 + i * 8, ey + Math.round(height * 0.44), 4, isBoss ? 14 : 10)
+  }
+
+  // Health bar for boss (only while alive/patrolling)
+  if (isBoss && state === ENEMY_STATES.PATROL) {
+    const segW = Math.floor(width / BOSS_ENEMY_HEALTH) - 1
+    for (let i = 0; i < BOSS_ENEMY_HEALTH; i++) {
+      ctx.fillStyle = i < health ? '#ff2244' : '#333'
+      ctx.fillRect(ex + i * (segW + 1), ey - 9, segW, 5)
     }
   }
 }
@@ -174,32 +215,7 @@ function drawEnemies(ctx, enemies, cameraX) {
     const ex = Math.round(enemy.x - cameraX)
     const ey = Math.round(enemy.y)
 
-    ctx.fillStyle = '#cc44cc'
-    ctx.fillRect(ex, ey, enemy.width, enemy.height)
-
-    // Eyes
-    ctx.fillStyle = '#220022'
-    const eyeY = ey + 7
-    if (enemy.facing === 1) {
-      ctx.fillRect(ex + enemy.width - 8, eyeY, 4, 4)
-    } else {
-      ctx.fillRect(ex + 4, eyeY, 4, 4)
-    }
-
-    // Ears
-    ctx.fillStyle = '#cc44cc'
-    ctx.fillRect(ex + 2,               ey - 4, 4, 5)
-    ctx.fillRect(ex + enemy.width - 6, ey - 4, 4, 5)
-    // Inner ear
-    ctx.fillStyle = '#ff88ff'
-    ctx.fillRect(ex + 3,               ey - 3, 2, 3)
-    ctx.fillRect(ex + enemy.width - 5, ey - 3, 2, 3)
-
-    // Stripes
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'
-    for (let i = 0; i < 2; i++) {
-      ctx.fillRect(ex + 4 + i * 7, ey + 14, 3, 10)
-    }
+    drawSingleEnemy(ctx, enemy, ex, ey)
 
     ctx.globalAlpha = 1
   }
@@ -212,9 +228,7 @@ function drawBoards(ctx, boards, cameraX) {
     ctx.fillStyle = '#b8895a'
     ctx.fillRect(sx, sy, board.width, board.height)
     ctx.fillStyle = 'rgba(0,0,0,0.15)'
-    for (let i = 0; i < board.width; i += 12) {
-      ctx.fillRect(sx + i, sy, 2, board.height)
-    }
+    for (let i = 0; i < board.width; i += 12) ctx.fillRect(sx + i, sy, 2, board.height)
     ctx.fillStyle = 'rgba(255,255,255,0.2)'
     ctx.fillRect(sx, sy, board.width, 2)
   }
@@ -259,36 +273,100 @@ function drawTreats(ctx, treats, cameraX) {
     const ty = Math.round(t.y)
     ctx.globalAlpha = pulse
     ctx.fillStyle = '#cc66ff'
-    ctx.fillRect(tx + 4, ty,     4, 12)  // vertical bar
-    ctx.fillRect(tx,     ty + 4, 12, 4)  // horizontal bar
+    ctx.fillRect(tx + 4, ty, 4, 12)
+    ctx.fillRect(tx, ty + 4, 12, 4)
     ctx.fillStyle = '#ffbbff'
-    ctx.fillRect(tx + 5, ty + 1, 2, 2)  // shine dot
+    ctx.fillRect(tx + 5, ty + 1, 2, 2)
     ctx.globalAlpha = 1
   }
 }
 
-function drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight) {
-  const sx = goalX - cameraX
-  if (sx > canvasWidth + 32 || sx < -32) return
-  const grad = ctx.createLinearGradient(sx, 0, sx + 16, 0)
-  grad.addColorStop(0,   'rgba(0,255,160,0)')
-  grad.addColorStop(0.5, 'rgba(0,255,160,0.55)')
-  grad.addColorStop(1,   'rgba(0,255,160,0)')
-  ctx.fillStyle = grad
-  ctx.fillRect(sx - 8, 0, 32, canvasHeight)
-  ctx.fillStyle = 'rgba(0,255,160,0.9)'
-  ctx.fillRect(sx + 6, 0, 4, canvasHeight)
+function drawKitten(ctx, cx, cy, freed, freedTimer) {
+  // Small golden kitten (about 10×14 px)
+  const bounce = freed ? Math.round(Math.sin(freedTimer * 12) * 3) : 0
+  const color = '#f5c040'
+  ctx.fillStyle = color
+  // Body
+  ctx.fillRect(cx - 5, cy - 8 + bounce, 10, 8)
+  // Head
+  ctx.fillRect(cx - 4, cy - 14 + bounce, 8, 7)
+  // Ears
+  ctx.fillRect(cx - 4, cy - 17 + bounce, 3, 3)
+  ctx.fillRect(cx + 1, cy - 17 + bounce, 3, 3)
+  // Eye
+  ctx.fillStyle = '#220000'
+  ctx.fillRect(cx + 1, cy - 12 + bounce, 2, 2)
+  // Tail
+  ctx.fillStyle = color
+  ctx.fillRect(cx + 5, cy - 5 + bounce, 3, 5)
+  ctx.fillRect(cx + 7, cy - 8 + bounce, 2, 3)
 }
 
-export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, fish, treats, particles, goalX, cameraX, canvasWidth, canvasHeight }) {
+function drawCage(ctx, cage, cameraX) {
+  if (!cage) return
+  const cx = Math.round(cage.x - cameraX)
+  const cy = Math.round(cage.y)
+  const { width, height, freed, freedTimer, health } = cage
+
+  // Dark interior
+  ctx.fillStyle = '#130a18'
+  ctx.fillRect(cx + 3, cy, width - 6, height)
+
+  // Kitten inside / outside
+  if (!freed) {
+    drawKitten(ctx, cx + Math.floor(width / 2), cy + height - 2, false, 0)
+  } else {
+    // Kitten escaping to the left of the cage
+    const escapeDist = Math.min(freedTimer * 80, 28)
+    drawKitten(ctx, cx - Math.round(escapeDist), cy + height - 2, true, freedTimer)
+  }
+
+  // Bars (drawn over kitten when locked)
+  if (!freed) {
+    ctx.fillStyle = '#999'
+    const barSpacing = 9
+    for (let bx = cx + 3; bx < cx + width - 3; bx += barSpacing) {
+      ctx.fillRect(bx, cy, 3, height)
+    }
+  } else {
+    // Broken bars: draw partial/bent remnants
+    ctx.fillStyle = '#666'
+    ctx.fillRect(cx + 3, cy, 3, Math.round(height * 0.4))
+    ctx.fillRect(cx + width - 6, cy, 3, Math.round(height * 0.3))
+    ctx.fillRect(cx + 12, cy + Math.round(height * 0.6), 3, Math.round(height * 0.4))
+  }
+
+  // Top and bottom frame bars
+  ctx.fillStyle = freed ? '#666' : '#aaa'
+  ctx.fillRect(cx, cy, width, 4)
+  ctx.fillRect(cx, cy + height - 4, width, 4)
+
+  // Chain / hook at top centre
+  ctx.fillStyle = '#888'
+  ctx.fillRect(cx + Math.floor(width / 2) - 1, cy - 14, 2, 14)
+  ctx.fillRect(cx + Math.floor(width / 2) - 4, cy - 16, 8, 3)
+
+  // Hit-point indicators above cage (only while locked)
+  if (!freed) {
+    for (let i = 0; i < CAGE_HEALTH; i++) {
+      ctx.fillStyle = i < health ? '#ffcc00' : '#333'
+      ctx.fillRect(cx + 4 + i * 15, cy - 25, 11, 6)
+    }
+  }
+}
+
+export function renderFrame(ctx, {
+  tilemap, player, boards, rocks, enemies, fish, treats, cage,
+  particles, cameraX, canvasWidth, canvasHeight,
+}) {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
   drawBackground(ctx, cameraX, canvasWidth, canvasHeight)
   drawTiles(ctx, tilemap, cameraX, canvasWidth)
-  if (goalX != null) drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight)
   drawBoards(ctx, boards ?? [], cameraX)
   drawRocks(ctx, rocks ?? [], cameraX)
   drawFish(ctx, fish ?? [], cameraX)
   drawTreats(ctx, treats ?? [], cameraX)
+  if (cage) drawCage(ctx, cage, cameraX)
   drawEnemies(ctx, enemies ?? [], cameraX)
   drawParticles(ctx, particles ?? [], cameraX)
   drawPlayer(ctx, player, cameraX)

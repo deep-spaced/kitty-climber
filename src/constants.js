@@ -54,8 +54,19 @@ export const ENEMY_STATES = {
   DYING: 'dying',
   DEAD: 'dead',
 }
-export const ENEMY_DYING_DURATION = 0.3  // seconds
+export const ENEMY_DYING_DURATION = 0.3   // seconds
+export const ENEMY_HURT_DURATION = 0.4   // invincibility after a hit
 export const SCORE_PER_KILL = 10
+
+export const BOSS_ENEMY_WIDTH = 40
+export const BOSS_ENEMY_HEIGHT = 50
+export const BOSS_ENEMY_HEALTH = 4
+
+export const CAGE_WIDTH = 48
+export const CAGE_HEIGHT = 52
+export const CAGE_HEALTH = 3
+export const CAGE_FREED_DELAY = 0.5   // seconds of open-cage animation before level clear
+export const CAGE_HURT_DURATION = 0.25  // immunity window per hit
 
 export const FISH_WIDTH = 16
 export const FISH_HEIGHT = 12

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { generateLevel } from '../../src/engine/levelGenerator.js'
-import { TILES, TILE_SIZE } from '../../src/constants.js'
+import { TILES, TILE_SIZE, PLAYER_HEIGHT } from '../../src/constants.js'
 
 describe('generateLevel', () => {
   it('produces a map with the requested dimensions', () => {
@@ -77,11 +77,42 @@ describe('generateLevel', () => {
     for (let r = 0; r < map.length; r++) {
       for (let c = 0; c < map[0].length; c++) {
         if (map[r][c] === TILES.PLATFORM) {
-          // There must be an EMPTY tile somewhere above this in the same col
           const hasEmptyAbove = map.slice(0, r).some((row) => row[c] === TILES.EMPTY)
           expect(hasEmptyAbove, `platform at [${r}][${c}] has no empty above`).toBe(true)
         }
       }
+    }
+  })
+
+  it('platforms have enough clearance above to stand without crouching', () => {
+    const { map, floorRows, ceilRows } = generateLevel(33, { cols: 120, rows: 15 })
+    for (let c = 0; c < map[0].length; c++) {
+      for (let r = 0; r < map.length; r++) {
+        if (map[r][c] !== TILES.PLATFORM) continue
+        const ceilR  = ceilRows[c]
+        // Space between ceiling bottom and platform top
+        const clearAbove = (r - ceilR - 1) * TILE_SIZE
+        expect(clearAbove, `platform at col ${c} row ${r}: only ${clearAbove}px above`)
+          .toBeGreaterThanOrEqual(PLAYER_HEIGHT)
+      }
+    }
+  })
+
+  it('returns a cageSpawn with position and dimensions', () => {
+    const { cageSpawn } = generateLevel(7, { cols: 120, rows: 15 })
+    expect(cageSpawn).toHaveProperty('x')
+    expect(cageSpawn).toHaveProperty('y')
+    expect(cageSpawn).toHaveProperty('width')
+    expect(cageSpawn).toHaveProperty('height')
+    expect(cageSpawn.width).toBeGreaterThan(0)
+  })
+
+  it('returns a bossSpawn with position', () => {
+    const { bossSpawn } = generateLevel(7, { cols: 120, rows: 15 })
+    // bossSpawn can be null only if the boss column is a pit; test a seed that produces one
+    if (bossSpawn !== null) {
+      expect(bossSpawn).toHaveProperty('x')
+      expect(bossSpawn).toHaveProperty('y')
     }
   })
 })

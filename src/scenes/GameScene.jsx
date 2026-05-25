@@ -45,28 +45,26 @@ const ATTACK_STATES = new Set([PLAYER_STATES.ATTACK_SCRATCH, PLAYER_STATES.ATTAC
 
 export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, onLevelClear, onGameOver }) {
   const getInput = useInput()
-  const { getTilemapWithBoards, tilemap, updateObstacles, levelWidthPx, spawnX, spawnY, goalX } = useLevel(seed, levelIndex)
+  const { getTilemapWithBoards, tilemap, updateObstacles, levelWidthPx, spawnX, spawnY } = useLevel(seed, levelIndex)
   const play = useAudio()
 
-  const canvasRef = useRef(null)
-  const playerRef = useRef(createPlayer(spawnX, spawnY))
-  const cameraXRef = useRef(0)
-  const obstaclesRef = useRef({ boards: [], rocks: [], enemies: [], fish: [], treats: [] })
+  const canvasRef    = useRef(null)
+  const playerRef    = useRef(createPlayer(spawnX, spawnY))
+  const cameraXRef   = useRef(0)
+  const obstaclesRef = useRef({ boards: [], rocks: [], enemies: [], fish: [], treats: [], cage: null })
   const particlesRef = useRef([])
 
-  const prevStateRef = useRef(playerRef.current.state)
+  const prevStateRef   = useRef(playerRef.current.state)
   const prevOnGroundRef = useRef(playerRef.current.onGround)
 
   const pausedRef = useRef(false)
-  const [paused, setPaused] = useState(false)
-
-  const [health, setHealth] = useState(playerRef.current.health)
-  const [score, setScore] = useState(initialScore)
+  const [paused, setPaused]     = useState(false)
+  const [health, setHealth]     = useState(playerRef.current.health)
+  const [score, setScore]       = useState(initialScore)
   const [fishCount, setFishCount] = useState(0)
-  const [gameOver, setGameOver] = useState(false)
+  const [gameOver, setGameOver]   = useState(false)
   const [levelClear, setLevelClear] = useState(false)
 
-  // Pause toggle via Escape key
   useEffect(() => {
     const handler = (e) => {
       if (e.key !== 'Escape') return
@@ -86,15 +84,14 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
   const update = useCallback((dt) => {
     if (gameOver || levelClear || pausedRef.current) return
 
-    const input = getInput()
+    const input   = getInput()
     const liveMap = getTilemapWithBoards()
     playerRef.current = updatePlayer(playerRef.current, input, liveMap, dt)
 
-    const p = playerRef.current
+    const p         = playerRef.current
     const prevState = prevStateRef.current
     const prevOnGround = prevOnGroundRef.current
 
-    // Edge-triggered audio + land particles
     if (p.state === PLAYER_STATES.JUMP && prevState !== PLAYER_STATES.JUMP) play('jump')
     if (p.onGround && !prevOnGround) {
       play('land')
@@ -102,12 +99,16 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
     }
     if (ATTACK_STATES.has(p.state) && !ATTACK_STATES.has(prevState)) play('attack')
 
-    prevStateRef.current = p.state
+    prevStateRef.current    = p.state
     prevOnGroundRef.current = p.onGround
 
-    const { boards, rocks, enemies, fish, treats, playerHit, enemyPlayerHit, killedEnemies, collectedFish, collectedTreats, goalReached } =
-      updateObstacles(p, dt)
-    obstaclesRef.current = { boards, rocks, enemies, fish, treats }
+    const {
+      boards, rocks, enemies, fish, treats, cage,
+      playerHit, enemyPlayerHit,
+      killedEnemies, collectedFish, collectedTreats,
+      cageDamaged, cageFreed,
+    } = updateObstacles(p, dt)
+    obstaclesRef.current = { boards, rocks, enemies, fish, treats, cage }
 
     if (killedEnemies.length > 0) {
       play('kill')
@@ -149,14 +150,15 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
       }
     }
 
-    if (goalReached && !levelClear) {
+    if (cageDamaged) play('cage')
+
+    if (cageFreed && !levelClear) {
       play('levelClear')
       setLevelClear(true)
     }
 
     particlesRef.current = updateParticles(particlesRef.current, dt)
-
-    cameraXRef.current = computeCameraX(playerRef.current.x, levelWidthPx, CANVAS_WIDTH)
+    cameraXRef.current   = computeCameraX(playerRef.current.x, levelWidthPx, CANVAS_WIDTH)
 
     setHealth((prev) => {
       const next = playerRef.current.health
@@ -170,19 +172,19 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
     const ctx = canvas.getContext('2d')
     renderFrame(ctx, {
       tilemap,
-      player: playerRef.current,
-      boards: obstaclesRef.current.boards,
-      rocks: obstaclesRef.current.rocks,
-      enemies: obstaclesRef.current.enemies,
-      fish: obstaclesRef.current.fish,
-      treats: obstaclesRef.current.treats,
+      player:   playerRef.current,
+      boards:   obstaclesRef.current.boards,
+      rocks:    obstaclesRef.current.rocks,
+      enemies:  obstaclesRef.current.enemies,
+      fish:     obstaclesRef.current.fish,
+      treats:   obstaclesRef.current.treats,
+      cage:     obstaclesRef.current.cage,
       particles: particlesRef.current,
-      goalX,
-      cameraX: cameraXRef.current,
-      canvasWidth: CANVAS_WIDTH,
+      cameraX:   cameraXRef.current,
+      canvasWidth:  CANVAS_WIDTH,
       canvasHeight: CANVAS_HEIGHT,
     })
-  }, [tilemap, goalX])
+  }, [tilemap])
 
   useGameLoop({ update, render })
 

@@ -1,52 +1,54 @@
 import { useRef, useCallback } from 'react'
-import { TILE_SIZE, TILES, ENEMY_STATES } from '../constants.js'
+import { TILE_SIZE, TILES, ENEMY_STATES, CAGE_HEALTH, CAGE_FREED_DELAY, CAGE_HURT_DURATION } from '../constants.js'
 import { generateLevel } from '../engine/levelGenerator.js'
 import { createBoard, createRock, updateBoard, updateRock } from '../entities/Obstacle.js'
-import { createEnemy, updateEnemy, hurtEnemy } from '../entities/Enemy.js'
+import { createEnemy, createBoss, updateEnemy, hurtEnemy } from '../entities/Enemy.js'
 import { aabbOverlap } from '../engine/physics.js'
 import { getAttackHitbox } from '../entities/Player.js'
 
-const ROCK_SPAWN_INTERVAL = 4.0  // seconds between rock spawns at each spawn point
+const ROCK_SPAWN_INTERVAL = 4.0
 
 export function useLevel(seed = 1, levelIndex = 0) {
-  const levelRef = useRef(null)
-  const boardsRef = useRef(null)
-  const rocksRef = useRef([])
+  const levelRef      = useRef(null)
+  const boardsRef     = useRef(null)
+  const rocksRef      = useRef([])
   const rockTimersRef = useRef(null)
-  const enemiesRef = useRef([])
-  const fishRef = useRef([])
-  const treatsRef = useRef([])
+  const enemiesRef    = useRef([])
+  const fishRef       = useRef([])
+  const treatsRef     = useRef([])
+  const cageRef       = useRef(null)
 
   if (levelRef.current === null) {
     const level = generateLevel(seed, { cols: 120, rows: 15, levelIndex })
     levelRef.current = level
 
-    // Build moving boards from descriptors
     boardsRef.current = level.movingBoards.map(createBoard)
-
-    // Rock spawn timers — stagger each spawn point so they don't all drop at once
     rockTimersRef.current = level.rockSpawns.map((_, i) => i * (ROCK_SPAWN_INTERVAL / level.rockSpawns.length))
 
-    // Enemies
+    // Regular enemies
     enemiesRef.current = level.enemySpawns.map((s) => createEnemy(s.x, s.y))
 
-    // Fish collectibles
-    fishRef.current = level.fishSpawns.map((s) => ({ ...s, collected: false }))
+    // Boss (if the generator produced one)
+    if (level.bossSpawn) {
+      enemiesRef.current = [...enemiesRef.current, createBoss(level.bossSpawn.x, level.bossSpawn.y)]
+    }
 
-    // Treat pickups
+    fishRef.current   = level.fishSpawns.map((s) => ({ ...s, collected: false }))
     treatsRef.current = level.treatSpawns.map((s) => ({ ...s, collected: false }))
+
+    cageRef.current = {
+      ...level.cageSpawn,
+      health: CAGE_HEALTH,
+      freed: false,
+      freedTimer: 0,
+      hurtTimer: 0,
+    }
   }
 
-  const { map, spawnX, spawnY, rockSpawns, goalCol } = levelRef.current
-  const levelWidthPx = map[0].length * TILE_SIZE
+  const { map, spawnX, spawnY, rockSpawns } = levelRef.current
+  const levelWidthPx  = map[0].length * TILE_SIZE
   const levelHeightPx = map.length * TILE_SIZE
-  const goalX = goalCol * TILE_SIZE
 
-  /**
-   * Advance all obstacles by dt seconds.
-   * Returns { boards, rocks } for rendering.
-   * Also returns `playerHit` = true if any active rock overlaps the player rect.
-   */
   const updateObstacles = useCallback((player, dt) => {
     // Moving boards
     boardsRef.current = boardsRef.current.map((b) => updateBoard(b, dt))
@@ -63,38 +65,34 @@ export function useLevel(seed = 1, levelIndex = 0) {
       return t - dt
     })
 
-    // Update active rocks
-    rocksRef.current = rocksRef.current.map((r) =>
-      updateRock(r, map, dt, levelHeightPx)
-    )
+    rocksRef.current = rocksRef.current.map((r) => updateRock(r, map, dt, levelHeightPx))
 
-    // Check player collision with rocks
-    const playerHit = rocksRef.current.some(
-      (r) => r.active && aabbOverlap(r, player)
-    )
+    const playerHit = rocksRef.current.some((r) => r.active && aabbOverlap(r, player))
 
-    // Update enemies and resolve combat
+    // Enemies + combat
     const attackHitbox = getAttackHitbox(player)
-    const killedEnemies = []  // array of {x, y} world-space centres
+    const killedEnemies = []
     enemiesRef.current = enemiesRef.current.map((enemy) => {
       if (enemy.state === ENEMY_STATES.DEAD) return enemy
-      // DYING enemies just tick their timer — no patrol, no contact
       if (enemy.state === ENEMY_STATES.DYING) return updateEnemy(enemy, map, dt)
       const moved = updateEnemy(enemy, map, dt)
-      if (attackHitbox && aabbOverlap(attackHitbox, moved)) {
-        killedEnemies.push({ x: moved.x + moved.width / 2, y: moved.y + moved.height / 2 })
-        return hurtEnemy(moved)
+      // Only damage if attack is active and enemy is not in invincibility window
+      if (attackHitbox && moved.hurtTimer <= 0 && aabbOverlap(attackHitbox, moved)) {
+        const hurt = hurtEnemy(moved)
+        if (hurt.state === ENEMY_STATES.DYING) {
+          killedEnemies.push({ x: moved.x + moved.width / 2, y: moved.y + moved.height / 2 })
+        }
+        return hurt
       }
       return moved
     })
 
-    // Enemy body contact deals damage to player (PATROL only)
     const enemyPlayerHit = enemiesRef.current.some(
       (e) => e.state === ENEMY_STATES.PATROL && aabbOverlap(e, player)
     )
 
-    // Fish collection — track positions for particles
-    const collectedFish = []  // array of {x, y} world-space centres
+    // Fish collection
+    const collectedFish = []
     fishRef.current = fishRef.current.map((f) => {
       if (f.collected) return f
       if (aabbOverlap(f, player)) {
@@ -115,41 +113,57 @@ export function useLevel(seed = 1, levelIndex = 0) {
       return t
     })
 
-    // Goal detection
-    const goalReached = player.x + player.width >= goalX
+    // Cage: attack interaction and freed timer
+    let cage = cageRef.current
+    let cageDamaged = false
+    let cageFreed   = false
+
+    cage = { ...cage, hurtTimer: Math.max(0, cage.hurtTimer - dt) }
+
+    if (cage.freed) {
+      cage = { ...cage, freedTimer: cage.freedTimer + dt }
+      if (cage.freedTimer >= CAGE_FREED_DELAY) cageFreed = true
+    } else if (attackHitbox && cage.hurtTimer <= 0 && aabbOverlap(attackHitbox, cage)) {
+      const newHealth = cage.health - 1
+      cage = {
+        ...cage,
+        health: Math.max(0, newHealth),
+        hurtTimer: CAGE_HURT_DURATION,
+        freed: newHealth <= 0,
+      }
+      cageDamaged = true
+    }
+
+    cageRef.current = cage
 
     return {
       boards: boardsRef.current,
-      rocks: rocksRef.current.filter((r) => r.active),
+      rocks:  rocksRef.current.filter((r) => r.active),
       enemies: enemiesRef.current,
-      fish: fishRef.current,
+      fish:   fishRef.current,
       treats: treatsRef.current,
+      cage,
       playerHit,
       enemyPlayerHit,
       killedEnemies,
       collectedFish,
       collectedTreats,
-      goalReached,
+      cageDamaged,
+      cageFreed,
     }
-  }, [map, rockSpawns, levelHeightPx, goalX])
+  }, [map, rockSpawns, levelHeightPx])
 
-  /**
-   * Build an augmented tilemap that includes moving boards as solid PLATFORM tiles.
-   * Called each frame before physics so the player can stand on boards.
-   */
   const getTilemapWithBoards = useCallback(() => {
     const boards = boardsRef.current
     if (boards.length === 0) return map
 
-    // Shallow-copy only the rows that boards touch
     const augmented = map.map((row) => row)
     for (const board of boards) {
       const row = Math.floor((board.y + board.height) / TILE_SIZE)
       if (row < 0 || row >= map.length) continue
-
-      augmented[row] = augmented[row].slice()  // copy row before mutating
+      augmented[row] = augmented[row].slice()
       const colStart = Math.max(0, Math.floor(board.x / TILE_SIZE))
-      const colEnd = Math.min(map[0].length - 1, Math.floor((board.x + board.width - 1) / TILE_SIZE))
+      const colEnd   = Math.min(map[0].length - 1, Math.floor((board.x + board.width - 1) / TILE_SIZE))
       for (let c = colStart; c <= colEnd; c++) {
         if (augmented[row][c] === TILES.EMPTY) augmented[row][c] = TILES.PLATFORM
       }
@@ -163,7 +177,6 @@ export function useLevel(seed = 1, levelIndex = 0) {
     updateObstacles,
     levelWidthPx,
     levelHeightPx,
-    goalX,
     spawnX,
     spawnY,
   }
