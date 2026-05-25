@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createPlayer, updatePlayer, hurtPlayer, getAttackHitbox } from '../../src/entities/Player.js'
+import { createPlayer, updatePlayer, hurtPlayer, healPlayer, getAttackHitbox } from '../../src/entities/Player.js'
 import { PLAYER_STATES, TILES, TILE_SIZE, MAX_HEALTH } from '../../src/constants.js'
 
 // Flat ground map: 1 row ceiling + 8 rows empty + 1 row floor, 20 cols wide
@@ -143,6 +143,32 @@ describe('hurtPlayer', () => {
     p = hurtPlayer(p)
     const again = hurtPlayer(p)
     expect(again.health).toBe(p.health)
+  })
+})
+
+describe('healPlayer', () => {
+  it('increases health by 1', () => {
+    let p = createPlayer(100, 100)
+    p = hurtPlayer(p)
+    expect(p.health).toBe(MAX_HEALTH - 1)
+    const healed = healPlayer(p)
+    expect(healed.health).toBe(MAX_HEALTH)
+  })
+
+  it('does not exceed MAX_HEALTH', () => {
+    const p = createPlayer(100, 100)
+    expect(p.health).toBe(MAX_HEALTH)
+    const healed = healPlayer(p)
+    expect(healed.health).toBe(MAX_HEALTH)
+  })
+
+  it('preserves all other fields', () => {
+    let p = createPlayer(50, 75)
+    p = hurtPlayer(p)
+    const healed = healPlayer(p)
+    expect(healed.x).toBe(p.x)
+    expect(healed.y).toBe(p.y)
+    expect(healed.state).toBe(p.state)
   })
 })
 

@@ -47,7 +47,15 @@ const fishCountStyle = {
   userSelect: 'none',
 }
 
-export default function HUD({ health, score, fishCount }) {
+const levelStyle = {
+  marginLeft: 14,
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.45)',
+  letterSpacing: 1,
+  userSelect: 'none',
+}
+
+export default function HUD({ health, score, fishCount, levelIndex }) {
   return (
     <div style={containerStyle}>
       {Array.from({ length: MAX_HEALTH }, (_, i) => {
@@ -65,6 +73,7 @@ export default function HUD({ health, score, fishCount }) {
           <span style={fishCountStyle}>{fishCount}</span>
         </>
       )}
+      {levelIndex != null && <span style={levelStyle}>LVL {levelIndex + 1}</span>}
     </div>
   )
 }

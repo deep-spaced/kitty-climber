@@ -1,4 +1,4 @@
-import { TILES, TILE_SIZE, ENEMY_WIDTH, ENEMY_HEIGHT, FISH_WIDTH, FISH_HEIGHT } from '../constants.js'
+import { TILES, TILE_SIZE, ENEMY_WIDTH, ENEMY_HEIGHT, FISH_WIDTH, FISH_HEIGHT, TREAT_WIDTH, TREAT_HEIGHT } from '../constants.js'
 
 // Mulberry32 seeded PRNG — fast, good distribution
 function mulberry32(seed) {
@@ -196,5 +196,27 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     }
   }
 
-  return { map, floorRows, ceilRows, movingBoards, rockSpawns, enemySpawns, fishSpawns, goalCol, spawnX, spawnY }
+  // --- Treat spawns: health pickups on solid floor, spaced from fish and each other ---
+  const treatCount = 2 + Math.floor(rand() * 2)  // 2–3 per level
+  const treatSpawns = []
+  for (let i = 0; i < treatCount; i++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const col = 10 + Math.floor(rand() * (goalCol - 15))
+      if (floorRows[col] === null) continue
+      const tooClose = treatSpawns.some((t) => Math.abs(t.col - col) < 8)
+        || fishSpawns.some((f) => Math.abs(f.col - col) < 5)
+      if (tooClose) continue
+      const floorRow = floorRows[col]
+      treatSpawns.push({
+        col,
+        x: col * TILE_SIZE + Math.floor((TILE_SIZE - TREAT_WIDTH) / 2),
+        y: floorRow * TILE_SIZE - TREAT_HEIGHT,
+        width: TREAT_WIDTH,
+        height: TREAT_HEIGHT,
+      })
+      break
+    }
+  }
+
+  return { map, floorRows, ceilRows, movingBoards, rockSpawns, enemySpawns, fishSpawns, treatSpawns, goalCol, spawnX, spawnY }
 }

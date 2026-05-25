@@ -8,7 +8,6 @@ import {
   MAX_HEALTH,
   ATTACK_DURATION,
   HURT_DURATION,
-  TILE_SIZE,
 } from '../constants.js'
 import { stepPhysics } from '../engine/physics.js'
 
@@ -133,6 +132,13 @@ export function hurtPlayer(player) {
     vx: 0,
     vy: 0,
   }
+}
+
+/**
+ * Restore 1 HP, capped at MAX_HEALTH.
+ */
+export function healPlayer(player) {
+  return { ...player, health: Math.min(player.health + 1, MAX_HEALTH) }
 }
 
 /**

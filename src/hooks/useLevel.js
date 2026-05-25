@@ -15,6 +15,7 @@ export function useLevel(seed = 1, levelIndex = 0) {
   const rockTimersRef = useRef(null)
   const enemiesRef = useRef([])
   const fishRef = useRef([])
+  const treatsRef = useRef([])
 
   if (levelRef.current === null) {
     const level = generateLevel(seed, { cols: 120, rows: 15, levelIndex })
@@ -31,6 +32,9 @@ export function useLevel(seed = 1, levelIndex = 0) {
 
     // Fish collectibles
     fishRef.current = level.fishSpawns.map((s) => ({ ...s, collected: false }))
+
+    // Treat pickups
+    treatsRef.current = level.treatSpawns.map((s) => ({ ...s, collected: false }))
   }
 
   const { map, spawnX, spawnY, rockSpawns, goalCol } = levelRef.current
@@ -100,6 +104,17 @@ export function useLevel(seed = 1, levelIndex = 0) {
       return f
     })
 
+    // Treat collection
+    const collectedTreats = []
+    treatsRef.current = treatsRef.current.map((t) => {
+      if (t.collected) return t
+      if (aabbOverlap(t, player)) {
+        collectedTreats.push({ x: t.x + t.width / 2, y: t.y + t.height / 2 })
+        return { ...t, collected: true }
+      }
+      return t
+    })
+
     // Goal detection
     const goalReached = player.x + player.width >= goalX
 
@@ -108,10 +123,12 @@ export function useLevel(seed = 1, levelIndex = 0) {
       rocks: rocksRef.current.filter((r) => r.active),
       enemies: enemiesRef.current,
       fish: fishRef.current,
+      treats: treatsRef.current,
       playerHit,
       enemyPlayerHit,
       killedEnemies,
       collectedFish,
+      collectedTreats,
       goalReached,
     }
   }, [map, rockSpawns, levelHeightPx, goalX])

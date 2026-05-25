@@ -251,6 +251,22 @@ function drawFish(ctx, fish, cameraX) {
   }
 }
 
+function drawTreats(ctx, treats, cameraX) {
+  const pulse = 0.65 + Math.sin(Date.now() / 280) * 0.35
+  for (const t of treats) {
+    if (t.collected) continue
+    const tx = Math.round(t.x - cameraX)
+    const ty = Math.round(t.y)
+    ctx.globalAlpha = pulse
+    ctx.fillStyle = '#cc66ff'
+    ctx.fillRect(tx + 4, ty,     4, 12)  // vertical bar
+    ctx.fillRect(tx,     ty + 4, 12, 4)  // horizontal bar
+    ctx.fillStyle = '#ffbbff'
+    ctx.fillRect(tx + 5, ty + 1, 2, 2)  // shine dot
+    ctx.globalAlpha = 1
+  }
+}
+
 function drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight) {
   const sx = goalX - cameraX
   if (sx > canvasWidth + 32 || sx < -32) return
@@ -264,7 +280,7 @@ function drawGoal(ctx, goalX, cameraX, canvasWidth, canvasHeight) {
   ctx.fillRect(sx + 6, 0, 4, canvasHeight)
 }
 
-export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, fish, particles, goalX, cameraX, canvasWidth, canvasHeight }) {
+export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, fish, treats, particles, goalX, cameraX, canvasWidth, canvasHeight }) {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
   drawBackground(ctx, cameraX, canvasWidth, canvasHeight)
   drawTiles(ctx, tilemap, cameraX, canvasWidth)
@@ -272,6 +288,7 @@ export function renderFrame(ctx, { tilemap, player, boards, rocks, enemies, fish
   drawBoards(ctx, boards ?? [], cameraX)
   drawRocks(ctx, rocks ?? [], cameraX)
   drawFish(ctx, fish ?? [], cameraX)
+  drawTreats(ctx, treats ?? [], cameraX)
   drawEnemies(ctx, enemies ?? [], cameraX)
   drawParticles(ctx, particles ?? [], cameraX)
   drawPlayer(ctx, player, cameraX)

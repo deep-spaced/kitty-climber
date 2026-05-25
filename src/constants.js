@@ -19,6 +19,7 @@ export const KEYS = {
   BITE: 'z',
   CROUCH: 'v',
   MAP: 'm',
+  PAUSE: 'Escape',
 }
 
 export const PLAYER_STATES = {
@@ -59,3 +60,6 @@ export const SCORE_PER_KILL = 10
 export const FISH_WIDTH = 16
 export const FISH_HEIGHT = 12
 export const FISH_SCORE = 5
+
+export const TREAT_WIDTH = 12
+export const TREAT_HEIGHT = 12

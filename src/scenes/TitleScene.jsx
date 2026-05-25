@@ -44,17 +44,25 @@ const keyStyle = {
   textAlign: 'right',
 }
 
+const highScoreStyle = {
+  fontSize: 13,
+  color: 'rgba(255,255,255,0.55)',
+  letterSpacing: 2,
+  marginBottom: 24,
+}
+
 const CONTROLS = [
   ['← →',      'move'],
   ['X',         'jump'],
   ['C',         'scratch'],
   ['Z',         'bite'],
   ['V',         'crouch'],
+  ['ESC',       'pause'],
   ['reach ◆◆', 'collect fish'],
   ['reach ▶▶', 'exit level'],
 ]
 
-export default function TitleScene({ onStart }) {
+export default function TitleScene({ onStart, highScore = 0 }) {
   const [blink, setBlink] = useState(true)
 
   useEffect(() => {
@@ -76,6 +84,7 @@ export default function TitleScene({ onStart }) {
     <div style={containerStyle} onClick={onStart}>
       <div style={titleStyle}>KITTY CLIMBER</div>
       <div style={subtitleStyle}>CAVE ADVENTURE</div>
+      {highScore > 0 && <div style={highScoreStyle}>BEST: {highScore}</div>}
       <div style={controlsGridStyle}>
         {CONTROLS.map(([key, action]) => (
           <>

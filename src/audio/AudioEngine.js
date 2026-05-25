@@ -76,5 +76,8 @@ export function createAudioEngine(ctx) {
 
     // Descending E-A-E dirge
     gameOver()   { play(() => chord(ctx, 'triangle', [330, 220, 165], 0.28, 0.24, 0.30)) },
+
+    // Gentle ascending C-E-G-A shimmer
+    heal()       { play(() => chord(ctx, 'sine', [523, 659, 784, 880], 0.16, 0.07, 0.18)) },
   }
 }

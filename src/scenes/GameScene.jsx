@@ -4,9 +4,9 @@ import { useInput } from '../hooks/useInput.js'
 import { useGameLoop } from '../hooks/useGameLoop.js'
 import { useLevel } from '../hooks/useLevel.js'
 import { useAudio } from '../hooks/useAudio.js'
-import { createPlayer, updatePlayer, hurtPlayer } from '../entities/Player.js'
+import { createPlayer, updatePlayer, hurtPlayer, healPlayer } from '../entities/Player.js'
 import { renderFrame, computeCameraX } from '../engine/renderer.js'
-import { emitHit, emitDeath, emitCollect, emitLand, updateParticles } from '../engine/particles.js'
+import { emitHit, emitDeath, emitCollect, emitLand, emitHeal, updateParticles } from '../engine/particles.js'
 import HUD from '../components/HUD.jsx'
 
 const overlayStyle = {
@@ -42,7 +42,7 @@ const controlsHintStyle = {
 
 const ATTACK_STATES = new Set([PLAYER_STATES.ATTACK_SCRATCH, PLAYER_STATES.ATTACK_BITE])
 
-export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGameOver }) {
+export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, onLevelClear, onGameOver }) {
   const getInput = useInput()
   const { getTilemapWithBoards, tilemap, updateObstacles, levelWidthPx, spawnX, spawnY, goalX } = useLevel(seed, levelIndex)
   const play = useAudio()
@@ -50,17 +50,31 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
   const canvasRef = useRef(null)
   const playerRef = useRef(createPlayer(spawnX, spawnY))
   const cameraXRef = useRef(0)
-  const obstaclesRef = useRef({ boards: [], rocks: [], enemies: [], fish: [] })
+  const obstaclesRef = useRef({ boards: [], rocks: [], enemies: [], fish: [], treats: [] })
   const particlesRef = useRef([])
 
   const prevStateRef = useRef(playerRef.current.state)
   const prevOnGroundRef = useRef(playerRef.current.onGround)
 
+  const pausedRef = useRef(false)
+  const [paused, setPaused] = useState(false)
+
   const [health, setHealth] = useState(playerRef.current.health)
-  const [score, setScore] = useState(0)
+  const [score, setScore] = useState(initialScore)
   const [fishCount, setFishCount] = useState(0)
   const [gameOver, setGameOver] = useState(false)
   const [levelClear, setLevelClear] = useState(false)
+
+  // Pause toggle via Escape key
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== 'Escape') return
+      pausedRef.current = !pausedRef.current
+      setPaused(pausedRef.current)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   useEffect(() => {
     if (!levelClear || !onLevelClear) return
@@ -69,7 +83,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
   }, [levelClear, onLevelClear, score])
 
   const update = useCallback((dt) => {
-    if (gameOver || levelClear) return
+    if (gameOver || levelClear || pausedRef.current) return
 
     const input = getInput()
     const liveMap = getTilemapWithBoards()
@@ -90,9 +104,9 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
     prevStateRef.current = p.state
     prevOnGroundRef.current = p.onGround
 
-    const { boards, rocks, enemies, fish, playerHit, enemyPlayerHit, killedEnemies, collectedFish, goalReached } =
+    const { boards, rocks, enemies, fish, treats, playerHit, enemyPlayerHit, killedEnemies, collectedFish, collectedTreats, goalReached } =
       updateObstacles(p, dt)
-    obstaclesRef.current = { boards, rocks, enemies, fish }
+    obstaclesRef.current = { boards, rocks, enemies, fish, treats }
 
     if (killedEnemies.length > 0) {
       play('kill')
@@ -109,6 +123,17 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
       for (const pos of collectedFish) {
         particlesRef.current = [...particlesRef.current, ...emitCollect(pos.x, pos.y)]
       }
+    }
+
+    if (collectedTreats.length > 0) {
+      play('heal')
+      let healed = playerRef.current
+      for (const pos of collectedTreats) {
+        healed = healPlayer(healed)
+        particlesRef.current = [...particlesRef.current, ...emitHeal(pos.x, pos.y)]
+      }
+      playerRef.current = healed
+      setHealth(healed.health)
     }
 
     if (playerHit || enemyPlayerHit) {
@@ -149,6 +174,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
       rocks: obstaclesRef.current.rocks,
       enemies: obstaclesRef.current.enemies,
       fish: obstaclesRef.current.fish,
+      treats: obstaclesRef.current.treats,
       particles: particlesRef.current,
       goalX,
       cameraX: cameraXRef.current,
@@ -167,10 +193,16 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
         height={CANVAS_HEIGHT}
         style={{ display: 'block', imageRendering: 'pixelated' }}
       />
-      <HUD health={health} score={score} fishCount={fishCount} />
+      <HUD health={health} score={score} fishCount={fishCount} levelIndex={levelIndex} />
       <div style={controlsHintStyle}>
-        ←→ move · x jump · c scratch · z bite · v crouch
+        ←→ move · x jump · c scratch · z bite · v crouch · esc pause
       </div>
+      {paused && !gameOver && !levelClear && (
+        <div style={overlayStyle} onClick={() => { pausedRef.current = false; setPaused(false) }}>
+          PAUSED
+          <div style={subTextStyle}>press ESC or click to resume</div>
+        </div>
+      )}
       {levelClear && (
         <div style={overlayStyle}>
           LEVEL CLEAR!
@@ -178,7 +210,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, onLevelClear, onGa
         </div>
       )}
       {gameOver && !levelClear && (
-        <div style={overlayStyle} onClick={onGameOver}>
+        <div style={overlayStyle} onClick={() => onGameOver(score)}>
           GAME OVER
           <div style={subTextStyle}>click to restart</div>
         </div>

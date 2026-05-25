@@ -35,6 +35,23 @@ export function emitCollect(x, y) {
   return burst(6, x, y, 120, ['#f0a030', '#ffe060', '#fff090'], 0.28)
 }
 
+// Treat collected — pink/violet sparkles drifting upward
+export function emitHeal(x, y) {
+  return Array.from({ length: 8 }, () => {
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI
+    const s = 60 + Math.random() * 80
+    const colors = ['#ff88cc', '#cc66ff', '#ffbbee', '#aa44ff']
+    return createParticle(
+      x + (Math.random() - 0.5) * 8,
+      y + (Math.random() - 0.5) * 8,
+      Math.cos(angle) * s,
+      Math.sin(angle) * s,
+      colors[Math.floor(Math.random() * colors.length)],
+      0.48 + Math.random() * 0.22,
+    )
+  })
+}
+
 // Player lands from a jump — sideways dust puffs
 export function emitLand(x, y) {
   return Array.from({ length: 4 }, (_, i) => {
