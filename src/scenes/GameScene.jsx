@@ -8,6 +8,7 @@ import { createPlayer, updatePlayer, hurtPlayer, healPlayer } from '../entities/
 import { renderFrame, computeCameraX } from '../engine/renderer.js'
 import { emitHit, emitDeath, emitCollect, emitLand, emitHeal, updateParticles } from '../engine/particles.js'
 import HUD from '../components/HUD.jsx'
+import DPad from '../components/DPad.jsx'
 
 const overlayStyle = {
   position: 'absolute',
@@ -194,6 +195,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
         style={{ display: 'block', imageRendering: 'pixelated' }}
       />
       <HUD health={health} score={score} fishCount={fishCount} levelIndex={levelIndex} />
+      <DPad />
       <div style={controlsHintStyle}>
         ←→ move · x jump · c scratch · z bite · v crouch · esc pause
       </div>

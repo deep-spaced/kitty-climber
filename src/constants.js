@@ -63,3 +63,5 @@ export const FISH_SCORE = 5
 
 export const TREAT_WIDTH = 12
 export const TREAT_HEIGHT = 12
+
+export const LEVEL_COUNT = 5  // levels before end screen
