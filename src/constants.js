@@ -6,6 +6,7 @@ export const CANVAS_HEIGHT = 480
 export const GRAVITY = 1800         // px per second squared
 export const MAX_FALL_SPEED = 900   // px per second
 export const JUMP_FORCE = -600      // px per second (negative = up)
+export const JUMP_CUT_VY = -360     // velocity cap when jump is released early
 export const MOVE_SPEED = 220       // px per second
 export const PLAYER_WIDTH = 28
 export const PLAYER_HEIGHT = 40

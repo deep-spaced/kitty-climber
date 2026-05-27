@@ -162,13 +162,28 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
     }
   })
 
-  // --- Rock spawns ---
-  const rockSpawnCount = 5 + levelIndex * 2
-  const rockSpawns = []
-  for (let i = 0; i < rockSpawnCount; i++) {
-    const col = 10 + Math.floor(rand() * (cols - 20))
-    rockSpawns.push({ col, row: ceilRows[col] })
+  // --- Rough ceiling patches: stalactite clusters that also serve as rock spawn points ---
+  const roughPatches = []
+  let patchCol = 8 + Math.floor(rand() * 6)
+  while (patchCol < cols - 8) {
+    roughPatches.push({
+      col: patchCol,
+      row: ceilRows[patchCol],
+      length: 10 + Math.floor(rand() * 20),  // stalactite length in px
+    })
+    patchCol += 6 + Math.floor(rand() * 10)
   }
+
+  // Shuffle patches using Fisher-Yates so rock spawns are distributed
+  for (let i = roughPatches.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [roughPatches[i], roughPatches[j]] = [roughPatches[j], roughPatches[i]]
+  }
+
+  const rockSpawnCount = 5 + levelIndex * 2
+  const rockSpawns = roughPatches
+    .slice(0, Math.min(rockSpawnCount, roughPatches.length))
+    .map((p) => ({ col: p.col, row: p.row }))
 
   const spawnX = TILE_SIZE * 2
   const spawnY = (floorRows[2] - 3) * TILE_SIZE
@@ -261,7 +276,7 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
 
   return {
     map, floorRows, ceilRows,
-    movingBoards, rockSpawns,
+    movingBoards, rockSpawns, roughPatches,
     enemySpawns, bossSpawn, cageSpawn,
     fishSpawns, treatSpawns,
     spawnX, spawnY,

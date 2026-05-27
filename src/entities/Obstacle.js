@@ -77,5 +77,6 @@ export function createBoard(descriptor) {
 export function updateBoard(board, dt) {
   const phase = board.phase + board.speed * dt
   const x = board.centerX + Math.sin(phase) * board.amplitude - board.width / 2
-  return { ...board, phase, x }
+  const dx = x - board.x  // horizontal displacement this frame
+  return { ...board, phase, x, dx }
 }

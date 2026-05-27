@@ -45,13 +45,34 @@ export function useLevel(seed = 1, levelIndex = 0) {
     }
   }
 
-  const { map, spawnX, spawnY, rockSpawns } = levelRef.current
+  const { map, spawnX, spawnY, rockSpawns, roughPatches } = levelRef.current
   const levelWidthPx  = map[0].length * TILE_SIZE
   const levelHeightPx = map.length * TILE_SIZE
 
   const updateObstacles = useCallback((player, dt) => {
+    // Detect which board (if any) the player is standing on before boards move
+    let boardUnderPlayer = null
+    const playerFeetY = player.y + player.height
+    for (const board of boardsRef.current) {
+      if (
+        Math.abs(playerFeetY - board.y) <= 2 &&
+        player.x + player.width > board.x &&
+        player.x < board.x + board.width
+      ) {
+        boardUnderPlayer = board
+        break
+      }
+    }
+
     // Moving boards
     boardsRef.current = boardsRef.current.map((b) => updateBoard(b, dt))
+
+    // Apply the updated board's dx to the player if they were riding it
+    let platformDx = 0
+    if (boardUnderPlayer !== null) {
+      const updated = boardsRef.current.find((b) => b.centerX === boardUnderPlayer.centerX)
+      if (updated) platformDx = updated.dx ?? 0
+    }
 
     // Rock spawn timers
     rockTimersRef.current = rockTimersRef.current.map((t, i) => {
@@ -150,6 +171,7 @@ export function useLevel(seed = 1, levelIndex = 0) {
       collectedTreats,
       cageDamaged,
       cageFreed,
+      platformDx,
     }
   }, [map, rockSpawns, levelHeightPx])
 
@@ -179,5 +201,6 @@ export function useLevel(seed = 1, levelIndex = 0) {
     levelHeightPx,
     spawnX,
     spawnY,
+    roughPatches,
   }
 }

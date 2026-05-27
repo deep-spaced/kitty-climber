@@ -45,7 +45,7 @@ const ATTACK_STATES = new Set([PLAYER_STATES.ATTACK_SCRATCH, PLAYER_STATES.ATTAC
 
 export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, onLevelClear, onGameOver }) {
   const getInput = useInput()
-  const { getTilemapWithBoards, tilemap, updateObstacles, levelWidthPx, spawnX, spawnY } = useLevel(seed, levelIndex)
+  const { getTilemapWithBoards, tilemap, updateObstacles, levelWidthPx, spawnX, spawnY, roughPatches } = useLevel(seed, levelIndex)
   const play = useAudio()
 
   const canvasRef    = useRef(null)
@@ -106,9 +106,13 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
       boards, rocks, enemies, fish, treats, cage,
       playerHit, enemyPlayerHit,
       killedEnemies, collectedFish, collectedTreats,
-      cageDamaged, cageFreed,
+      cageDamaged, cageFreed, platformDx,
     } = updateObstacles(p, dt)
     obstaclesRef.current = { boards, rocks, enemies, fish, treats, cage }
+
+    if (platformDx !== 0) {
+      playerRef.current = { ...playerRef.current, x: playerRef.current.x + platformDx }
+    }
 
     if (killedEnemies.length > 0) {
       play('kill')
@@ -179,6 +183,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
       fish:     obstaclesRef.current.fish,
       treats:   obstaclesRef.current.treats,
       cage:     obstaclesRef.current.cage,
+      roughPatches,
       particles: particlesRef.current,
       cameraX:   cameraXRef.current,
       canvasWidth:  CANVAS_WIDTH,

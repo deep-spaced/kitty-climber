@@ -281,6 +281,38 @@ function drawTreats(ctx, treats, cameraX) {
   }
 }
 
+function drawRoughPatches(ctx, roughPatches, cameraX, canvasWidth) {
+  if (!roughPatches || roughPatches.length === 0) return
+  const startCol = Math.floor(cameraX / TILE_SIZE) - 1
+  const endCol   = startCol + Math.ceil(canvasWidth / TILE_SIZE) + 2
+
+  for (const patch of roughPatches) {
+    const { col, row, length } = patch
+    if (col < startCol || col > endCol) continue
+
+    const sx = Math.round(col * TILE_SIZE - cameraX)
+    const sy = (row + 1) * TILE_SIZE  // bottom edge of ceiling tile
+    const half = Math.round(TILE_SIZE * 0.38)
+    const midX = sx + Math.round(TILE_SIZE / 2)
+
+    ctx.fillStyle = '#3a2a1a'
+    ctx.beginPath()
+    ctx.moveTo(midX - half, sy)
+    ctx.lineTo(midX + half, sy)
+    ctx.lineTo(midX, sy + length)
+    ctx.closePath()
+    ctx.fill()
+
+    ctx.fillStyle = '#554433'
+    ctx.beginPath()
+    ctx.moveTo(midX - half + 2, sy)
+    ctx.lineTo(midX + 3, sy)
+    ctx.lineTo(midX, sy + length)
+    ctx.closePath()
+    ctx.fill()
+  }
+}
+
 function drawKitten(ctx, cx, cy, freed, freedTimer) {
   // Small golden kitten (about 10×14 px)
   const bounce = freed ? Math.round(Math.sin(freedTimer * 12) * 3) : 0
@@ -357,11 +389,12 @@ function drawCage(ctx, cage, cameraX) {
 
 export function renderFrame(ctx, {
   tilemap, player, boards, rocks, enemies, fish, treats, cage,
-  particles, cameraX, canvasWidth, canvasHeight,
+  roughPatches, particles, cameraX, canvasWidth, canvasHeight,
 }) {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight)
   drawBackground(ctx, cameraX, canvasWidth, canvasHeight)
   drawTiles(ctx, tilemap, cameraX, canvasWidth)
+  drawRoughPatches(ctx, roughPatches, cameraX, canvasWidth)
   drawBoards(ctx, boards ?? [], cameraX)
   drawRocks(ctx, rocks ?? [], cameraX)
   drawFish(ctx, fish ?? [], cameraX)

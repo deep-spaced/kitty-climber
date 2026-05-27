@@ -5,6 +5,7 @@ import {
   CROUCH_HEIGHT,
   MOVE_SPEED,
   JUMP_FORCE,
+  JUMP_CUT_VY,
   MAX_HEALTH,
   ATTACK_DURATION,
   HURT_DURATION,
@@ -25,6 +26,7 @@ export function createPlayer(startX, startY) {
     stateTimer: 0,
     onGround: false,
     jumpConsumed: false,
+    jumpHeld: false,
   }
 }
 
@@ -33,7 +35,7 @@ export function createPlayer(startX, startY) {
  * Returns a new player object (immutable update pattern).
  */
 export function updatePlayer(player, input, tilemap, dt) {
-  let { x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, width, height } = player
+  let { x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, jumpHeld = false, width, height } = player
 
   stateTimer = Math.max(0, stateTimer - dt)
 
@@ -82,12 +84,19 @@ export function updatePlayer(player, input, tilemap, dt) {
         vy = JUMP_FORCE
         onGround = false
         jumpConsumed = true
+        jumpHeld = true
       }
     }
   }
 
   // Reset jump latch when key released
   if (!input.jump) jumpConsumed = false
+
+  // Variable jump height: releasing button early cuts upward velocity
+  if (jumpHeld && !input.jump && vy < 0) {
+    vy = Math.max(vy, JUMP_CUT_VY)
+    jumpHeld = false
+  }
 
   // --- Physics step ---
   const next = stepPhysics({ x, y, vx, vy, width, height }, tilemap, dt)
@@ -96,6 +105,7 @@ export function updatePlayer(player, input, tilemap, dt) {
   vx = next.vx
   vy = next.vy
   onGround = next.onGround
+  if (onGround) jumpHeld = false  // always clear when landed
 
   // --- Derive state from motion (when not locked) ---
   if (!nowAttacking && !hurting) {
@@ -115,7 +125,7 @@ export function updatePlayer(player, input, tilemap, dt) {
     state = PLAYER_STATES.IDLE
   }
 
-  return { ...player, x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, width, height }
+  return { ...player, x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, jumpHeld, width, height }
 }
 
 /**
