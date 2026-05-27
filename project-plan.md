@@ -2,166 +2,130 @@
 
 ## Tech Stack
 
-- **Framework:** React (with Vite for fast dev/build)
-- **Game Loop:** Custom `requestAnimationFrame` loop (no heavy game engine — keeps bundle small)
-- **Rendering:** HTML5 Canvas via React ref
-- **State:** React Context + `useReducer` for game state; local component state for UI overlays
-- **Testing:** Vitest + React Testing Library
-- **Language:** JavaScript (ES modules)
+- **Framework:** React 18 (with Vite)
+- **Game Loop:** Custom `requestAnimationFrame` loop
+- **Rendering:** HTML5 Canvas via React ref; React only for HUD/overlays
+- **State:** `useRef` for mutable game state; React state for UI
+- **Testing:** Vitest + React Testing Library (jsdom)
+- **Language:** JavaScript ES modules
 
 ---
 
 ## Repository Structure
 
 ```
-kitty-climber/
-├── public/
-│   └── assets/           # sprite sheets, audio (placeholder PNGs to start)
-├── src/
-│   ├── engine/           # platform-agnostic game logic
-│   │   ├── gameLoop.js       # requestAnimationFrame driver
-│   │   ├── physics.js        # gravity, collision detection
-│   │   ├── levelGenerator.js # procedural tunnel generation
-│   │   └── inputHandler.js   # keyboard mapping
-│   ├── entities/         # game objects
-│   │   ├── Player.js         # Edith — movement, attack, health
-│   │   ├── Rat.js            # enemy AI, hit detection
-│   │   ├── Kitten.js         # cage entity + release trigger
-│   │   ├── Treat.js          # health pickup
-│   │   └── Obstacle.js       # falling rocks, moving boards
-│   ├── scenes/           # top-level game screens
-│   │   ├── TitleScreen.jsx
-│   │   ├── MapView.jsx       # Mount Twitchy overview, fog of war
-│   │   ├── GameScene.jsx     # canvas + HUD wrapper
-│   │   └── EndScreen.jsx     # disco ball celebration
-│   ├── components/       # reusable React UI
-│   │   ├── HUD.jsx           # health bar, treat count
-│   │   └── Overlay.jsx       # pause / game-over modal
-│   ├── hooks/
-│   │   ├── useGameLoop.js    # drives engine tick inside React
-│   │   ├── useInput.js       # keyboard state
-│   │   └── useLevel.js       # level generation + entity lifecycle
-│   ├── context/
-│   │   └── GameContext.jsx   # global game state (score, lives, kittens found)
-│   ├── constants.js          # tile size, gravity, speeds, key bindings
-│   └── main.jsx
-├── tests/
-│   ├── engine/
-│   ├── entities/
-│   └── scenes/
-├── index.html
-├── vite.config.js
-└── package.json
+src/
+  constants.js          — all magic numbers and enums
+  engine/               — pure JS (no React): physics, input, gameLoop, levelGenerator, renderer, particles, storage
+  entities/             — pure JS: Player, Enemy, Obstacle
+  hooks/                — React hooks bridging engine ↔ React: useInput, useGameLoop, useLevel, useAudio
+  components/           — React UI: HUD, DPad
+  scenes/               — top-level scene components: TitleScene, MapView, GameScene, EndScreen
+  audio/                — AudioEngine (Web Audio API, procedural SFX)
+tests/                  — mirrors src/ structure
 ```
 
 ---
 
 ## Phased Build Plan
 
-### Phase 1 — Scaffolding & Core Loop
+### ✅ Phase 1 — Scaffolding & Core Loop (v0.1.0)
 
-**Goal:** Get a canvas on screen with a character that moves.
-
-- [ ] `npm create vite@latest` — React template
-- [ ] Configure Vitest
-- [ ] `constants.js` — gravity, tile size (32px), key map
-- [ ] `inputHandler.js` — track key-down/up state
-- [ ] `useInput` hook — exposes `{ left, right, jump, attack, crouch }` booleans
-- [ ] `useGameLoop` hook — `requestAnimationFrame` with fixed timestep (60 fps target)
-- [ ] `physics.js` — apply gravity, AABB collision against tile map
-- [ ] `Player.js` — position, velocity, state machine (`idle | run | jump | crouch | attack`)
-- [ ] `GameScene.jsx` — mounts canvas, wires loop + input, draws player rectangle placeholder
-
-**Tests:** physics collision, player state transitions, input mapping
+- Vite + React 18 scaffold
+- `constants.js` — gravity, tile size, key map
+- `inputHandler.js` + `useInput` hook
+- `useGameLoop` — fixed-timestep rAF loop
+- `physics.js` — gravity, AABB tile collision
+- `Player.js` — position, velocity, state machine
+- `GameScene.jsx` — canvas mount, loop, placeholder rendering
 
 ---
 
-### Phase 2 — Level Generation
+### ✅ Phase 2 — Procedural Levels & Obstacles (v0.2.0)
 
-**Goal:** A playable tunnel level with platforms.
-
-- [ ] `levelGenerator.js` — procedural tunnel using a cellular automaton or corridor walk algorithm
-  - Outputs a 2D tile array: `empty | wall | floor | ceiling`
-  - Configurable width (long scroll) and height (~15 tiles)
-  - Seed-based so levels are reproducible for testing
-- [ ] Camera / viewport scroll — follows player horizontally
-- [ ] Tile renderer on canvas (solid colored tiles initially)
-- [ ] Obstacle spawning:
-  - **Falling rocks** — periodic drop from ceiling tiles
-  - **Moving boards** — horizontal platforms crossing pit gaps (sine-wave motion)
-- [ ] `useLevel` hook — instantiates entities from generated map
-
-**Tests:** generator produces walkable paths, obstacles spawn within bounds
+- `levelGenerator.js` — seeded corridor walk, smooth tunnel, platforms, pits
+- Camera scroll following player
+- Tile renderer
+- Falling rocks (periodic ceiling drops)
+- Moving boards (sine-wave across pits)
+- `useLevel` hook — entity lifecycle
 
 ---
 
-### Phase 3 — Enemies & Combat
+### ✅ Phase 3 — Enemies, Combat & Collectibles (v0.3–0.5)
 
-**Goal:** Rats that fight back, treats that heal.
-
-- [ ] `Rat.js` — simple patrol AI (reverse on wall/edge), chase range, attack cooldown
-  - Animations: idle, walk, scratch, bite (sprite states, not assets yet)
-  - Health: 1–3 hits randomized at spawn
-- [ ] Hit detection — player attacks (`c` = scratch, `z` = bite) vs. rat hitbox
-- [ ] Player damage — rat attack hits player, 4-hit health bar
-- [ ] `Treat.js` — static pickup; restores 1 hit point
-  - Scattered at generation time + dropped randomly (30% chance) on rat defeat
-- [ ] `HUD.jsx` — health hearts / bar, treat count
-- [ ] Game-over flow on 0 health
-
-**Tests:** rat AI state machine, hit detection math, treat drop RNG (mock Math.random)
+- `Enemy.js` — patrol AI, wall/edge reversal, 1-hit defeat
+- **Boss rat** — 4-hit guard placed before the cage
+- Hit detection — player attacks vs enemy hitboxes
+- Player damage — enemy contact damages player
+- `Treat.js` collectible — restores 1 HP on pickup
+- Fish collectibles — score bonus
+- `HUD.jsx` — health bar, score, fish count
+- Game-over flow on 0 health
+- Particle system (hit, death, collect, land, heal)
 
 ---
 
-### Phase 4 — Kittens & Level Completion
+### ✅ Phase 4 — Kittens & Level Completion (v0.6)
 
-**Goal:** Each level has a goal — rescue a kitten.
-
-- [ ] `Kitten.js` — cage entity placed at tunnel end
-  - Takes 3 hits to open; kitten appears, level-complete fires after short delay
-- [ ] Level-complete overlay — transition to map view
-- [ ] Progress tracked in `GameContext` (which kittens found)
-
-**Tests:** cage hit counter, completion trigger
+- Kitten cage entity at tunnel end — 3-hit to open
+- Kitten escape animation on free
+- Level-complete flow with score carry-over
+- 4-level arc (Base → First Peak → Tallest Peak → Far Side)
 
 ---
 
-### Phase 5 — Map View & World Structure
+### ✅ Phase 5 — Polish, Audio & Infrastructure (v0.7)
 
-**Goal:** Mount Twitchy overworld with fog of war.
-
-- [ ] `MapView.jsx` — static SVG/canvas mountain silhouette (two peaks)
-  - Four tunnel entrances as clickable markers
-  - Unexplored tunnels hidden until player reaches the map area
-- [ ] Navigation: press `m` in-game toggles map; select tunnel to enter
-- [ ] Level ordering: Base → Peak 1 → Tallest Peak → Far Side
-
----
-
-### Phase 6 — Sprites & Audio
-
-**Goal:** Replace colored rectangles with actual art.
-
-- [ ] Sprite sheet format — PNG atlas + JSON frame data (Aseprite-compatible)
-- [ ] Sprite renderer utility — draws frame from atlas on canvas
-- [ ] Edith sprites: idle, run (4 frames), jump, crouch, scratch, bite
-- [ ] Rat sprites: idle, walk, scratch, bite, hurt, death
-- [ ] Kitten cage sprite + open animation
-- [ ] Treat sprite (sparkle animation)
-- [ ] Background tiles: rock walls, dirt floor, mountain backdrop layers (parallax)
-- [ ] Audio: jump, scratch, bite, hurt, treat pickup, level complete, disco end
+- `AudioEngine.js` — procedural SFX via Web Audio (jump, land, hurt, kill, collect, levelClear, gameOver, heal, cage)
+- High score persistence (localStorage)
+- `TitleScene.jsx` — controls reference, high score display, any-key start
+- `EndScreen.jsx` — disco ball canvas animation, score display, replay
+- `DPad.jsx` — on-screen mobile controls
+- Pause (Escape key)
+- GitHub Pages deployment (Vite base config + Actions workflow)
 
 ---
 
-### Phase 7 — End Game & Polish
+### ✅ Phase 6 — Bug Fixes & Feel (v0.8.0)
 
-**Goal:** All kittens found → disco celebration.
+- Variable jump height — hold X for full jump, tap for short hop
+- Platform riding — player moves with moving boards
+- Rocks fall from stalactite ceiling patches (deterministic spawn points)
+- Platform clearance guarantee — no platform requires crouching
 
-- [ ] `EndScreen.jsx` — disco ball drops, all characters dance (CSS animation + canvas combo)
-- [ ] Title screen with start button
-- [ ] Pause menu (Escape key)
-- [ ] Local high-score / completion time (localStorage)
-- [ ] Mobile: on-screen D-pad overlay (stretch goal)
+---
+
+### 🔄 Phase 7 — Map View / Level Select (current)
+
+**Goal:** Replace direct-to-level flow with a Mount Twitchy overworld map.
+
+- `MapView.jsx` — canvas mountain with two peaks, snow caps, moon/stars
+- 4 tunnel-entrance nodes connected by a dashed path
+- Nodes show state: locked (gray), available (orange glow), cleared (green + kitten icon)
+- Sequential unlock — level N available only after level N−1 is cleared
+- Click or Enter to start the available level
+- After level clear → return to map; after all 4 cleared → end screen
+- After game over → return to map to retry current level
+
+---
+
+### Backlog
+
+- Rat health variety (1–3 hits, randomised at spawn) per project definition
+- Treats dropped on rat defeat (30% chance) per project definition
+- In-game `m` key mini-map overlay (overview of discovered tunnel)
+- Tabby striping / sprite improvements for Edith
+- Enemy scratch/bite animations
+
+---
+
+## Testing Strategy
+
+- **Unit tests** (Vitest): pure functions — physics, level generator, entity state machines
+- **Integration tests** (Vitest + jsdom): hooks with fake timers
+- **Component tests** (React Testing Library): HUD, EndScreen, MapView render/interaction
+- **Manual smoke tests** — dev server walk-through each phase checkpoint
 
 ---
 
@@ -169,32 +133,10 @@ kitty-climber/
 
 | Key | Action |
 |-----|--------|
-| ← → | Move left / right |
-| `x` | Jump |
+| ← → | Move |
+| `x` | Jump (hold for higher) |
 | `c` | Scratch attack |
 | `z` | Bite attack |
 | `v` | Crouch |
-| `m` | Toggle map view |
-
----
-
-## Testing Strategy
-
-- **Unit tests** (Vitest): pure functions — physics, level generator, entity state machines, hit detection
-- **Integration tests** (Vitest + jsdom): hooks like `useInput`, `useGameLoop` with fake timers
-- **Component tests** (React Testing Library): HUD renders correct health, overlay appears on game-over
-- **Manual smoke tests** — run the dev server and walk through each phase checkpoint
-
----
-
-## Milestone Summary
-
-| Milestone | Deliverable |
-|-----------|-------------|
-| M1 | Moving character on canvas |
-| M2 | Scrolling generated tunnel level |
-| M3 | Rats, combat, health, treats |
-| M4 | Kitten cages, level completion |
-| M5 | Map view, all 4 levels navigable |
-| M6 | Sprites and audio |
-| M7 | End screen, title, polish |
+| `m` | Map view (in-game, backlog) |
+| `Esc` | Pause |

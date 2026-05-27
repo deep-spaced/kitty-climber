@@ -52,14 +52,12 @@ const highScoreStyle = {
 }
 
 const CONTROLS = [
-  ['← →',      'move'],
-  ['X',         'jump'],
-  ['C',         'scratch'],
-  ['Z',         'bite'],
-  ['V',         'crouch'],
-  ['ESC',       'pause'],
-  ['reach ◆◆', 'collect fish'],
-  ['reach ▶▶', 'exit level'],
+  ['← →', 'move'],
+  ['X',    'jump (hold = higher)'],
+  ['C',    'scratch'],
+  ['Z',    'bite'],
+  ['V',    'crouch'],
+  ['ESC',  'pause'],
 ]
 
 export default function TitleScene({ onStart, highScore = 0 }) {

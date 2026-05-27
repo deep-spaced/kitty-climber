@@ -1,56 +1,63 @@
 import { useState, useRef, useCallback } from 'react'
 import TitleScene from './scenes/TitleScene.jsx'
+import MapView from './scenes/MapView.jsx'
 import GameScene from './scenes/GameScene.jsx'
 import EndScreen from './scenes/EndScreen.jsx'
 import { getHighScore, saveHighScore } from './engine/storage.js'
 import { LEVEL_COUNT } from './constants.js'
 
 export default function App() {
-  const [scene, setScene] = useState('title')
-  const [levelIndex, setLevelIndex] = useState(0)
-  const [seed, setSeed] = useState(1)
-  const [gameKey, setGameKey] = useState(0)
-  const [highScore, setHighScore] = useState(() => getHighScore())
-  const [finalScore, setFinalScore] = useState(0)
+  const [scene, setScene]               = useState('title')
+  const [levelsCleared, setLevelsCleared] = useState(0)
+  const [gameKey, setGameKey]           = useState(0)
+  const [highScore, setHighScore]       = useState(() => getHighScore())
+  const [finalScore, setFinalScore]     = useState(0)
   const startScoreRef = useRef(0)
 
-  const handleStart = useCallback(() => setScene('playing'), [])
+  const handleStart = useCallback(() => setScene('map'), [])
+
+  const handleMapEnter = useCallback(() => {
+    setGameKey((k) => k + 1)
+    setScene('playing')
+  }, [])
 
   const handleLevelClear = useCallback((score) => {
-    if (levelIndex >= LEVEL_COUNT - 1) {
+    const newCleared = levelsCleared + 1
+    if (newCleared >= LEVEL_COUNT) {
       saveHighScore(score)
-      const best = getHighScore()
-      setHighScore(best)
+      setHighScore(getHighScore())
       setFinalScore(score)
       startScoreRef.current = 0
+      setLevelsCleared(newCleared)
       setScene('end')
     } else {
       startScoreRef.current = score
-      setLevelIndex((prev) => prev + 1)
-      setSeed((prev) => prev + 17)
-      setGameKey((prev) => prev + 1)
+      setLevelsCleared(newCleared)
+      setScene('map')
     }
-  }, [levelIndex])
+  }, [levelsCleared])
 
   const handleGameOver = useCallback((score) => {
     saveHighScore(score)
     setHighScore(getHighScore())
     startScoreRef.current = 0
-    setLevelIndex(0)
-    setSeed(1)
-    setGameKey((prev) => prev + 1)
-    setScene('title')
+    setGameKey((k) => k + 1)
+    setScene('map')
   }, [])
 
   const handleReplay = useCallback(() => {
-    setLevelIndex(0)
-    setSeed(1)
-    setGameKey((prev) => prev + 1)
-    setScene('playing')
+    setLevelsCleared(0)
+    startScoreRef.current = 0
+    setGameKey((k) => k + 1)
+    setScene('map')
   }, [])
 
   if (scene === 'title') {
     return <TitleScene onStart={handleStart} highScore={highScore} />
+  }
+
+  if (scene === 'map') {
+    return <MapView levelsCleared={levelsCleared} onEnter={handleMapEnter} />
   }
 
   if (scene === 'end') {
@@ -63,6 +70,10 @@ export default function App() {
       />
     )
   }
+
+  // scene === 'playing': level index and seed are derived from levelsCleared
+  const levelIndex = levelsCleared
+  const seed       = 1 + levelIndex * 17
 
   return (
     <GameScene
