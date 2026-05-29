@@ -29,6 +29,11 @@ Find the kittens. They are randomly hidden on Mount Twitchy.
 Mount Twitchy: a white-capped mountain with two peaks. The mountain has tunnels throughout it.
 These tunnels are the main levels for the game.
 
+## Level Select / Map View
+
+After starting the game, the level select or map view is shown first.
+This is a picture of a mountain with the four levels shown as spots on the map with a line between them. The levels can only be chosen once they are defeated.
+
 ## Levels
 
 There are a total of four tunnels, one tunnel per level.

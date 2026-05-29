@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(npm install *)",
+      "Bash(npm test *)",
+      "Bash(node -e ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npm run *)",
+      "Bash(npm version *)",
+      "Bash(git push *)",
+      "Bash(node -p \"require\\('./package.json'\\).version\")",
+      "Bash(git commit *)",
+      "Bash(grep -v \"^$\")",
+      "Bash(npx vitest *)"
+    ]
+  }
+}

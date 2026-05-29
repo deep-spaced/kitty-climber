@@ -23,8 +23,11 @@ const mockCtx = {
   globalAlpha: 1,
 }
 
+let rafCallback = null
+
 beforeEach(() => {
-  vi.stubGlobal('requestAnimationFrame', vi.fn())
+  rafCallback = null
+  vi.stubGlobal('requestAnimationFrame', vi.fn((fn) => { rafCallback = fn; return 1 }))
   vi.stubGlobal('cancelAnimationFrame', vi.fn())
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockCtx)
 })
@@ -64,5 +67,19 @@ describe('EndScreen', () => {
     render(<EndScreen score={200} highScore={200} isNewRecord={false} onReplay={onReplay} />)
     fireEvent.click(screen.getByText('PLAY AGAIN'))
     expect(onReplay).toHaveBeenCalledOnce()
+  })
+
+  it('draws to the canvas when rAF fires', () => {
+    render(<EndScreen score={100} highScore={100} isNewRecord={false} onReplay={() => {}} />)
+    // Fire the first animation tick to exercise drawEndFrame and the tick closure
+    if (rafCallback) rafCallback(0)
+    if (rafCallback) rafCallback(16)
+    expect(mockCtx.fillRect).toHaveBeenCalled()
+  })
+
+  it('cancels animation frame on unmount', () => {
+    const { unmount } = render(<EndScreen score={100} highScore={100} isNewRecord={false} onReplay={() => {}} />)
+    unmount()
+    expect(cancelAnimationFrame).toHaveBeenCalled()
   })
 })

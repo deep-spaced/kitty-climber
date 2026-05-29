@@ -6,6 +6,8 @@ import {
   MOVE_SPEED,
   JUMP_FORCE,
   JUMP_CUT_VY,
+  JUMP_BOOST_FORCE,
+  JUMP_BOOST_MAX_TIME,
   MAX_HEALTH,
   ATTACK_DURATION,
   HURT_DURATION,
@@ -27,6 +29,7 @@ export function createPlayer(startX, startY) {
     onGround: false,
     jumpConsumed: false,
     jumpHeld: false,
+    jumpBoostTimer: 0,
   }
 }
 
@@ -35,7 +38,7 @@ export function createPlayer(startX, startY) {
  * Returns a new player object (immutable update pattern).
  */
 export function updatePlayer(player, input, tilemap, dt) {
-  let { x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, jumpHeld = false, width, height } = player
+  let { x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, jumpHeld = false, jumpBoostTimer = 0, width, height } = player
 
   stateTimer = Math.max(0, stateTimer - dt)
 
@@ -85,6 +88,7 @@ export function updatePlayer(player, input, tilemap, dt) {
         onGround = false
         jumpConsumed = true
         jumpHeld = true
+        jumpBoostTimer = JUMP_BOOST_MAX_TIME
       }
     }
   }
@@ -92,10 +96,17 @@ export function updatePlayer(player, input, tilemap, dt) {
   // Reset jump latch when key released
   if (!input.jump) jumpConsumed = false
 
+  // Variable jump height: apply upward boost while jump is held and boost time remains
+  if (jumpHeld && input.jump && vy < 0 && jumpBoostTimer > 0) {
+    vy += JUMP_BOOST_FORCE * dt
+    jumpBoostTimer = Math.max(0, jumpBoostTimer - dt)
+  }
+
   // Variable jump height: releasing button early cuts upward velocity
   if (jumpHeld && !input.jump && vy < 0) {
     vy = Math.max(vy, JUMP_CUT_VY)
     jumpHeld = false
+    jumpBoostTimer = 0
   }
 
   // --- Physics step ---
@@ -105,7 +116,7 @@ export function updatePlayer(player, input, tilemap, dt) {
   vx = next.vx
   vy = next.vy
   onGround = next.onGround
-  if (onGround) jumpHeld = false  // always clear when landed
+  if (onGround) { jumpHeld = false; jumpBoostTimer = 0 }  // always clear when landed
 
   // --- Derive state from motion (when not locked) ---
   if (!nowAttacking && !hurting) {
@@ -125,7 +136,7 @@ export function updatePlayer(player, input, tilemap, dt) {
     state = PLAYER_STATES.IDLE
   }
 
-  return { ...player, x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, jumpHeld, width, height }
+  return { ...player, x, y, vx, vy, facing, state, health, stateTimer, onGround, jumpConsumed, jumpHeld, jumpBoostTimer, width, height }
 }
 
 /**

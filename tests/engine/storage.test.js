@@ -51,3 +51,21 @@ describe('saveHighScore', () => {
     expect(getHighScore()).toBe(300)
   })
 })
+
+describe('error resilience', () => {
+  it('getHighScore returns 0 when localStorage.getItem throws', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => { throw new Error('storage blocked') },
+      setItem: vi.fn(),
+    })
+    expect(getHighScore()).toBe(0)
+  })
+
+  it('saveHighScore does not throw when localStorage.setItem throws', () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => { throw new Error('storage blocked') },
+    })
+    expect(() => saveHighScore(100)).not.toThrow()
+  })
+})

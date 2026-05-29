@@ -7,6 +7,8 @@ export const GRAVITY = 1800         // px per second squared
 export const MAX_FALL_SPEED = 900   // px per second
 export const JUMP_FORCE = -600      // px per second (negative = up)
 export const JUMP_CUT_VY = -360     // velocity cap when jump is released early
+export const JUMP_BOOST_FORCE = -900 // additional upward acceleration (px/s²) while jump is held
+export const JUMP_BOOST_MAX_TIME = 0.18 // max seconds the boost can be applied after initial jump
 export const MOVE_SPEED = 220       // px per second
 export const PLAYER_WIDTH = 28
 export const PLAYER_HEIGHT = 40

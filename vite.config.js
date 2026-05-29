@@ -8,5 +8,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test-setup.js'],
+    coverage: {
+      provider: 'v8',
+      exclude: ['src/main.jsx', 'vite.config.js', 'dist/**', 'tests/**'],
+    },
   },
 })

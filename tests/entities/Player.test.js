@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createPlayer, updatePlayer, hurtPlayer, healPlayer, getAttackHitbox } from '../../src/entities/Player.js'
-import { PLAYER_STATES, TILES, TILE_SIZE, MAX_HEALTH } from '../../src/constants.js'
+import { PLAYER_STATES, TILES, TILE_SIZE, MAX_HEALTH, JUMP_CUT_VY, JUMP_BOOST_MAX_TIME } from '../../src/constants.js'
 
 // Flat ground map: 1 row ceiling + 8 rows empty + 1 row floor, 20 cols wide
 function makeMap() {
@@ -82,6 +82,62 @@ describe('updatePlayer — movement', () => {
     p = updatePlayer(p, { ...NO_INPUT, jump: true }, map, DT)
     // vy should only increase from gravity, not get another jump boost
     expect(p.vy).toBeGreaterThan(vyAfterFirstJump)
+  })
+
+  it('full hold reaches a higher apex than a tap', () => {
+    const map = makeMap()
+
+    // Tap jump: press for 1 frame then release
+    let tap = settled(map)
+    tap = updatePlayer(tap, { ...NO_INPUT, jump: true }, map, DT)
+    tap = updatePlayer(tap, NO_INPUT, map, DT)
+    // Simulate until apex (vy crosses 0)
+    let tapApex = tap.y
+    while (tap.vy < 0 && !tap.onGround) {
+      tap = updatePlayer(tap, NO_INPUT, map, DT)
+      tapApex = tap.y
+    }
+
+    // Full hold: hold jump for the entire boost window
+    const holdFrames = Math.ceil(JUMP_BOOST_MAX_TIME / DT) + 1
+    let hold = settled(map)
+    hold = updatePlayer(hold, { ...NO_INPUT, jump: true }, map, DT)
+    for (let i = 0; i < holdFrames; i++) {
+      hold = updatePlayer(hold, { ...NO_INPUT, jump: true }, map, DT)
+    }
+    let holdApex = hold.y
+    while (hold.vy < 0 && !hold.onGround) {
+      hold = updatePlayer(hold, NO_INPUT, map, DT)
+      holdApex = hold.y
+    }
+
+    // Higher apex = lower y value (y increases downward)
+    expect(holdApex).toBeLessThan(tapApex)
+  })
+
+  it('early release cuts upward velocity to JUMP_CUT_VY', () => {
+    const map = makeMap()
+    let p = settled(map)
+    // Press jump to start the arc
+    p = updatePlayer(p, { ...NO_INPUT, jump: true }, map, DT)
+    expect(p.vy).toBeLessThan(0) // moving upward
+    // Release on the very next frame while still ascending
+    p = updatePlayer(p, NO_INPUT, map, DT)
+    // vy must be clamped — it cannot be more negative than JUMP_CUT_VY
+    expect(p.vy).toBeGreaterThanOrEqual(JUMP_CUT_VY)
+  })
+
+  it('boost stops applying after the max hold window expires', () => {
+    const map = makeMap()
+    let p = settled(map)
+    // Hold jump for longer than the boost window
+    const extraFrames = Math.ceil(JUMP_BOOST_MAX_TIME / DT) + 10
+    p = updatePlayer(p, { ...NO_INPUT, jump: true }, map, DT)
+    for (let i = 0; i < extraFrames; i++) {
+      p = updatePlayer(p, { ...NO_INPUT, jump: true }, map, DT)
+    }
+    // After the boost window the timer must be exhausted
+    expect(p.jumpBoostTimer).toBe(0)
   })
 
   it('enters CROUCH state when crouch key held on ground', () => {

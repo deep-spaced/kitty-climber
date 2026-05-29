@@ -5,7 +5,7 @@ import { createAudioEngine } from '../../src/audio/AudioEngine.js'
 function makeNode() {
   return {
     type: '',
-    frequency: { value: 440, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
+    frequency: { value: 440, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() },
     gain: { value: 1, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn() },
     Q: { value: 1 },
     connect: vi.fn(),
@@ -29,7 +29,7 @@ function makeMockCtx(state = 'running') {
   }
 }
 
-const SOUNDS = ['jump', 'land', 'hurt', 'attack', 'kill', 'collect', 'levelClear', 'gameOver']
+const SOUNDS = ['jump', 'land', 'hurt', 'attack', 'kill', 'collect', 'levelClear', 'gameOver', 'heal', 'cage']
 
 describe('AudioEngine — all sounds play without throwing', () => {
   SOUNDS.forEach((name) => {
