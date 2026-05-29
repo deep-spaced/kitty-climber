@@ -54,11 +54,15 @@ export const ENEMY_WIDTH = 26
 export const ENEMY_HEIGHT = 32
 export const ENEMY_STATES = {
   PATROL: 'patrol',
+  ATTACK: 'attack',
   DYING: 'dying',
   DEAD: 'dead',
 }
 export const ENEMY_DYING_DURATION = 0.3   // seconds
 export const ENEMY_HURT_DURATION = 0.4   // invincibility after a hit
+export const ENEMY_ATTACK_RANGE = 80     // px — horizontal distance to trigger lunge
+export const ENEMY_ATTACK_DURATION = 0.35 // seconds per lunge cycle
+export const ENEMY_LUNGE_SPEED = 220     // px per second during lunge
 export const SCORE_PER_KILL = 10
 
 export const BOSS_ENEMY_WIDTH = 40

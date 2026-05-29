@@ -132,16 +132,68 @@ function drawPlayer(ctx, player, cameraX) {
     ctx.fillRect(px + width - 9, py + height - 7, 6, 7)
   }
 
-  if (state === PLAYER_STATES.ATTACK_SCRATCH || state === PLAYER_STATES.ATTACK_BITE) {
-    const reach = 36
-    const hbX = facing === 1 ? px + width : px - reach
-    ctx.fillStyle = 'rgba(255,100,0,0.25)'
-    ctx.fillRect(hbX, py + 4, reach, height - 8)
-    ctx.fillStyle = '#ff8844'
-    for (let i = 0; i < 3; i++) {
-      const cx = facing === 1 ? px + width + 2 + i * 5 : px - 4 - i * 5
-      ctx.fillRect(cx, py + 6, 2, 10)
+  if (state === PLAYER_STATES.ATTACK_SCRATCH) {
+    // Wide overhead swipe — three claw arcs fanning upward from the paw
+    const originX = facing === 1 ? px + width : px
+    const originY = py + Math.round(height * 0.35)
+    const arcRadius = 30
+    // Glow behind the arc
+    ctx.fillStyle = 'rgba(255,140,0,0.18)'
+    ctx.beginPath()
+    ctx.arc(originX, originY, arcRadius + 4, -Math.PI * 0.85, -Math.PI * 0.05)
+    if (facing === -1) ctx.arc(originX, originY, arcRadius + 4, -Math.PI * 0.95, -Math.PI * 0.15)
+    ctx.fill()
+    // Three claw lines fanning in a 110-degree arc
+    ctx.strokeStyle = '#ffaa33'
+    ctx.lineWidth = 3
+    const fanDir = facing === 1 ? 0 : Math.PI
+    const angles = [-0.55, 0, 0.55]   // radians offset from forward
+    for (const offset of angles) {
+      const angle = fanDir + offset - Math.PI * 0.5 * (facing === 1 ? -1 : 1)
+      ctx.beginPath()
+      ctx.moveTo(originX, originY)
+      ctx.lineTo(
+        originX + Math.cos(angle) * arcRadius * facing,
+        originY + Math.sin(angle) * arcRadius,
+      )
+      ctx.stroke()
     }
+    // Claw tips — small bright dots at the arc end
+    ctx.fillStyle = '#ffffff'
+    for (const offset of angles) {
+      const angle = fanDir + offset - Math.PI * 0.5 * (facing === 1 ? -1 : 1)
+      ctx.fillRect(
+        Math.round(originX + Math.cos(angle) * arcRadius * facing) - 1,
+        Math.round(originY + Math.sin(angle) * arcRadius) - 1,
+        3, 3,
+      )
+    }
+    ctx.lineWidth = 1
+  } else if (state === PLAYER_STATES.ATTACK_BITE) {
+    // Focused forward lunge — elongated jaw snapping at mid-body height
+    const reach = 38
+    const jawY = py + Math.round(height * 0.42)
+    const jawX = facing === 1 ? px + width : px - reach
+    // Dark gum backing
+    ctx.fillStyle = 'rgba(180,20,20,0.28)'
+    ctx.fillRect(jawX, jawY - 6, reach, 16)
+    // Upper jaw — tapered rectangle
+    ctx.fillStyle = '#cc2222'
+    ctx.fillRect(jawX, jawY - 4, reach, 5)
+    // Lower jaw
+    ctx.fillRect(jawX, jawY + 4, reach, 5)
+    // Teeth — alternating white rectangles along both jaws
+    ctx.fillStyle = '#f5f5e0'
+    for (let i = 0; i < 5; i++) {
+      const tx = jawX + 3 + i * 7
+      if (tx + 4 > jawX + reach) break
+      ctx.fillRect(tx, jawY - 3, 4, 4)  // upper tooth
+      ctx.fillRect(tx + 2, jawY + 3, 4, 4)  // lower tooth (offset for interlocking look)
+    }
+    // Saliva drip — single pixel highlight at the tip
+    ctx.fillStyle = 'rgba(255,255,200,0.7)'
+    const tipX = facing === 1 ? jawX + reach - 2 : jawX
+    ctx.fillRect(tipX, jawY + 1, 2, 2)
   }
 }
 
@@ -191,6 +243,44 @@ function drawSingleEnemy(ctx, enemy, ex, ey) {
   const stripes = isBoss ? 3 : 2
   for (let i = 0; i < stripes; i++) {
     ctx.fillRect(ex + 4 + i * 8, ey + Math.round(height * 0.44), 4, isBoss ? 14 : 10)
+  }
+
+  // Attack animation — lunge pose with claws/teeth and motion streak
+  if (state === ENEMY_STATES.ATTACK) {
+    // Motion-blur streak behind the body
+    const streakDir = facing === 1 ? -1 : 1
+    for (let i = 1; i <= 3; i++) {
+      ctx.fillStyle = `rgba(204,68,204,${0.12 - i * 0.03})`
+      ctx.fillRect(ex + streakDir * i * 5, ey + 4, width, height - 8)
+    }
+    // Body tint — aggressive bright red-pink over the already-drawn body
+    ctx.fillStyle = flash ? '#ffffff' : '#ff2288'
+    ctx.fillRect(ex, ey, width, height)
+    // Re-draw stripes on the tinted body
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'
+    const s = isBoss ? 3 : 2
+    for (let i = 0; i < s; i++) {
+      ctx.fillRect(ex + 4 + i * 8, ey + Math.round(height * 0.44), 4, isBoss ? 14 : 10)
+    }
+    // Claws extending forward
+    const clawBaseX = facing === 1 ? ex + width : ex
+    const clawY = ey + Math.round(height * 0.5)
+    ctx.fillStyle = '#ffffff'
+    for (let i = 0; i < 3; i++) {
+      const cx = facing === 1 ? clawBaseX + 2 + i * 4 : clawBaseX - 4 - i * 4
+      ctx.fillRect(cx, clawY - 4 + i * 3, 3, 6)
+    }
+    // Angry eyes — bright red
+    ctx.fillStyle = '#ff0000'
+    const aEyeOff = isBoss ? 11 : 8
+    const aEyeW  = isBoss ? 6 : 4
+    const aEyeH  = isBoss ? 5 : 4
+    const aEyeY  = ey + Math.round(height * 0.22)
+    if (facing === 1) {
+      ctx.fillRect(ex + width - aEyeOff, aEyeY, aEyeW, aEyeH)
+    } else {
+      ctx.fillRect(ex + aEyeOff - aEyeW, aEyeY, aEyeW, aEyeH)
+    }
   }
 
   // Health bar for boss (only while alive/patrolling)

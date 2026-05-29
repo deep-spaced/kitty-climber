@@ -1,6 +1,7 @@
 import {
   ENEMY_SPEED, ENEMY_WIDTH, ENEMY_HEIGHT,
   ENEMY_STATES, ENEMY_DYING_DURATION, ENEMY_HURT_DURATION,
+  ENEMY_ATTACK_RANGE, ENEMY_ATTACK_DURATION, ENEMY_LUNGE_SPEED,
   BOSS_ENEMY_WIDTH, BOSS_ENEMY_HEIGHT, BOSS_ENEMY_HEALTH,
   TILE_SIZE, TILES, GRAVITY, MAX_FALL_SPEED,
 } from '../constants.js'
@@ -22,6 +23,7 @@ export function createEnemy(x, y) {
     isBoss: false,
     hurtTimer: 0,
     dyingTimer: 0,
+    attackTimer: 0,
   }
 }
 
@@ -38,10 +40,11 @@ export function createBoss(x, y) {
     isBoss: true,
     hurtTimer: 0,
     dyingTimer: 0,
+    attackTimer: 0,
   }
 }
 
-export function updateEnemy(enemy, tilemap, dt) {
+export function updateEnemy(enemy, tilemap, dt, playerX, playerY) {
   if (enemy.state === ENEMY_STATES.DEAD) return enemy
 
   const hurtTimer = Math.max(0, enemy.hurtTimer - dt)
@@ -58,9 +61,23 @@ export function updateEnemy(enemy, tilemap, dt) {
 
   const rows = tilemap.length
   const cols = tilemap[0].length
-  let { x, y, vx, vy, facing } = enemy
+  let { x, y, vx, vy, facing, state, attackTimer } = enemy
 
-  // Gravity
+  attackTimer = Math.max(0, attackTimer - dt)
+
+  // --- Attack state: lunge toward player until timer expires ---
+  if (state === ENEMY_STATES.ATTACK) {
+    if (attackTimer === 0) {
+      // Lunge finished — resume patrol at normal speed toward same direction
+      state = ENEMY_STATES.PATROL
+      vx = facing * ENEMY_SPEED
+    } else {
+      // Surge forward at lunge speed
+      vx = facing * ENEMY_LUNGE_SPEED
+    }
+  }
+
+  // --- Gravity ---
   vy = Math.min(vy + GRAVITY * dt, MAX_FALL_SPEED)
   y += vy * dt
 
@@ -97,13 +114,37 @@ export function updateEnemy(enemy, tilemap, dt) {
   const hasFloor = floorAhead === TILES.FLOOR || floorAhead === TILES.PLATFORM
 
   if (wallAhead || !hasFloor) {
+    // Cancel a lunge if it runs into a wall
+    if (state === ENEMY_STATES.ATTACK) {
+      state = ENEMY_STATES.PATROL
+      attackTimer = 0
+    }
     vx = -vx
     facing = -facing
   } else {
     x = nextX
   }
 
-  return { ...enemy, x, y, vx, vy, facing, hurtTimer }
+  // --- Transition to attack when player is close and enemy is patrolling ---
+  if (
+    state === ENEMY_STATES.PATROL &&
+    hurtTimer === 0 &&
+    playerX !== undefined &&
+    playerY !== undefined
+  ) {
+    const dx = playerX - x
+    const dy = Math.abs(playerY - y)
+    const sameLane = dy < enemy.height * 1.5
+    const inRange = Math.abs(dx) < ENEMY_ATTACK_RANGE
+    const playerAhead = (facing === 1 && dx > 0) || (facing === -1 && dx < 0)
+    if (sameLane && inRange && playerAhead) {
+      state = ENEMY_STATES.ATTACK
+      attackTimer = ENEMY_ATTACK_DURATION
+      vx = facing * ENEMY_LUNGE_SPEED
+    }
+  }
+
+  return { ...enemy, x, y, vx, vy, facing, hurtTimer, state, attackTimer }
 }
 
 export function hurtEnemy(enemy) {

@@ -96,7 +96,7 @@ export function useLevel(seed = 1, levelIndex = 0) {
     enemiesRef.current = enemiesRef.current.map((enemy) => {
       if (enemy.state === ENEMY_STATES.DEAD) return enemy
       if (enemy.state === ENEMY_STATES.DYING) return updateEnemy(enemy, map, dt)
-      const moved = updateEnemy(enemy, map, dt)
+      const moved = updateEnemy(enemy, map, dt, player.x, player.y)
       // Only damage if attack is active and enemy is not in invincibility window
       if (attackHitbox && moved.hurtTimer <= 0 && aabbOverlap(attackHitbox, moved)) {
         const hurt = hurtEnemy(moved)
@@ -109,7 +109,7 @@ export function useLevel(seed = 1, levelIndex = 0) {
     })
 
     const enemyPlayerHit = enemiesRef.current.some(
-      (e) => e.state === ENEMY_STATES.PATROL && aabbOverlap(e, player)
+      (e) => (e.state === ENEMY_STATES.PATROL || e.state === ENEMY_STATES.ATTACK) && aabbOverlap(e, player)
     )
 
     // Fish collection
