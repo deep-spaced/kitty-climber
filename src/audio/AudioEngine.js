@@ -3,175 +3,48 @@
  * Each play* helper is standalone; createAudioEngine composes them with
  * a shared AudioContext so callers don't manage the context directly.
  *
- * Music system:
+ * Background music:
+ *   "Up the Ladder" by Eric Matyas — soundimage.org (royalty-free, attribution required)
+ *   Played via HTMLAudioElement so it works independently of the Web Audio context.
  *   startMusic() / stopMusic() / pauseMusic() / resumeMusic()
- *   Lazy chiptune: square-wave melody over a bass pulse + triangle click.
- *   Uses a look-ahead scheduler (ctx.currentTime) for drift-free looping.
  */
 
-import {
-  MUSIC_VOLUME,
-  MUSIC_TEMPO_BPM,
-  MUSIC_MELODY_GAIN,
-  MUSIC_BASS_GAIN,
-  MUSIC_PERC_GAIN,
-} from '../constants.js'
+import { MUSIC_VOLUME } from '../constants.js'
+
+// Path resolved relative to Vite's base URL at build time
+const MUSIC_SRC = `${import.meta.env.BASE_URL}music/up-the-ladder.mp3`
 
 // ---------------------------------------------------------------------------
-// Music sequencer data
+// HTMLAudio-based music player — created once per engine instance
 // ---------------------------------------------------------------------------
 
-// C minor pentatonic: C3 Eb3 F3 G3 Bb3 C4 Eb4 F4 G4 Bb4
-const MELODY_NOTES = [
-  130.81, 155.56, 174.61, 196.00, 233.08,
-  261.63, 311.13, 349.23, 392.00, 466.16,
-]
+function createMusicPlayer() {
+  let el = null
+  let wanted = false
 
-// Melody sequence (indices into MELODY_NOTES, null = rest)
-// 16 steps at a quarter-note each, slow wandering feel
-const MELODY_SEQ = [0, null, 2, 1, null, 3, 2, null, 4, 3, null, 5, null, 4, 6, null]
-
-// Bass root + fifth alternating (C2 / G2)
-const BASS_ROOT  = 65.41
-const BASS_FIFTH = 98.00
-const BASS_SEQ   = [
-  BASS_ROOT, null, BASS_FIFTH, null,
-  BASS_ROOT, null, BASS_FIFTH, null,
-  BASS_ROOT, null, BASS_FIFTH, null,
-  BASS_ROOT, null, BASS_FIFTH, null,
-]
-
-// Percussion: 1 = kick-click on beat 1 & 3 of a 4-beat bar (every 4 steps)
-const PERC_SEQ = [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
-
-// ---------------------------------------------------------------------------
-// Low-level note schedulers (pure functions, no React)
-// ---------------------------------------------------------------------------
-
-function scheduleNote(ctx, masterGain, freq, relGain, startTime, duration) {
-  const o = ctx.createOscillator()
-  const g = ctx.createGain()
-  o.type = 'square'
-  o.frequency.setValueAtTime(freq, startTime)
-  g.gain.setValueAtTime(relGain, startTime)
-  g.gain.linearRampToValueAtTime(0.0001, startTime + duration)
-  o.connect(g)
-  g.connect(masterGain)
-  o.start(startTime)
-  o.stop(startTime + duration)
-}
-
-function schedulePerc(ctx, masterGain, startTime) {
-  const o = ctx.createOscillator()
-  const g = ctx.createGain()
-  o.type = 'triangle'
-  o.frequency.setValueAtTime(180, startTime)
-  o.frequency.linearRampToValueAtTime(60, startTime + 0.04)
-  g.gain.setValueAtTime(1.0, startTime)
-  g.gain.linearRampToValueAtTime(0.0001, startTime + 0.06)
-  o.connect(g)
-  g.connect(masterGain)
-  o.start(startTime)
-  o.stop(startTime + 0.07)
-}
-
-// ---------------------------------------------------------------------------
-// Music sequencer factory — returns { start, stop, pause, resume }
-// ---------------------------------------------------------------------------
-
-function createMusicSequencer(ctx) {
-  const SEQ_LEN     = MELODY_SEQ.length   // 16 steps
-  const BEAT_SEC    = 60 / MUSIC_TEMPO_BPM  // seconds per beat
-  // Each step = one quarter note
-  const STEP_SEC    = BEAT_SEC
-  const NOTE_DUR    = STEP_SEC * 0.72     // note length (legato-ish)
-
-  // Master gain for all music — allows fade without touching SFX
-  const masterGain = ctx.createGain()
-  masterGain.gain.setValueAtTime(MUSIC_VOLUME, ctx.currentTime)
-  masterGain.connect(ctx.destination)
-
-  let schedulerTimer = null   // setTimeout handle
-  let stepIndex      = 0
-  let nextStepTime   = 0      // ctx.currentTime of next step to schedule
-  let running        = false
-  let pausedAt       = 0      // ctx.currentTime when paused (for offset calc)
-  let pauseOffset    = 0      // accumulated paused duration
-
-  const LOOKAHEAD_SEC  = 0.10  // schedule this far ahead
-  const SCHEDULE_INTERVAL_MS = 50  // how often the scheduler fires
-
-  function scheduleStep(step, atTime) {
-    // Melody
-    const melIdx = MELODY_SEQ[step]
-    if (melIdx !== null) {
-      scheduleNote(ctx, masterGain, MELODY_NOTES[melIdx], MUSIC_MELODY_GAIN, atTime, NOTE_DUR)
+  function getEl() {
+    if (!el) {
+      try {
+        el = new Audio(MUSIC_SRC)
+        el.loop   = true
+        el.volume = MUSIC_VOLUME
+      } catch (_) {
+        el = null
+      }
     }
-
-    // Bass
-    const bassFreq = BASS_SEQ[step]
-    if (bassFreq !== null) {
-      scheduleNote(ctx, masterGain, bassFreq, MUSIC_BASS_GAIN, atTime, NOTE_DUR * 1.4)
-    }
-
-    // Percussion
-    if (PERC_SEQ[step]) {
-      schedulePerc(ctx, masterGain, atTime)
-    }
-  }
-
-  function tick() {
-    // Schedule all steps that fall within the look-ahead window
-    while (nextStepTime < ctx.currentTime + LOOKAHEAD_SEC) {
-      scheduleStep(stepIndex % SEQ_LEN, nextStepTime)
-      stepIndex  = (stepIndex + 1) % SEQ_LEN
-      nextStepTime += STEP_SEC
-    }
-    schedulerTimer = setTimeout(tick, SCHEDULE_INTERVAL_MS)
+    return el
   }
 
   return {
-    start() {
-      if (running) return
-      running      = true
-      stepIndex    = 0
-      nextStepTime = ctx.currentTime + 0.05
-      masterGain.gain.setValueAtTime(MUSIC_VOLUME, ctx.currentTime)
-      tick()
+    want()   { wanted = true },
+    unwant() { wanted = false; const a = getEl(); if (a) { a.pause(); a.currentTime = 0 } },
+    tryPlay() {
+      if (!wanted) return
+      getEl()?.play().catch(() => {})
     },
-
-    stop() {
-      if (!running) return
-      running = false
-      clearTimeout(schedulerTimer)
-      schedulerTimer = null
-      masterGain.gain.cancelScheduledValues(ctx.currentTime)
-      masterGain.gain.setValueAtTime(masterGain.gain.value, ctx.currentTime)
-      masterGain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.25)
-    },
-
-    pause() {
-      if (!running) return
-      running  = false
-      pausedAt = ctx.currentTime
-      clearTimeout(schedulerTimer)
-      schedulerTimer = null
-      masterGain.gain.cancelScheduledValues(ctx.currentTime)
-      masterGain.gain.setValueAtTime(masterGain.gain.value, ctx.currentTime)
-      masterGain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.15)
-    },
-
-    resume() {
-      if (running) return
-      running      = true
-      pauseOffset  = ctx.currentTime - pausedAt
-      nextStepTime = Math.max(nextStepTime + pauseOffset, ctx.currentTime + 0.05)
-      masterGain.gain.cancelScheduledValues(ctx.currentTime)
-      masterGain.gain.linearRampToValueAtTime(MUSIC_VOLUME, ctx.currentTime + 0.15)
-      tick()
-    },
-
-    isRunning() { return running },
+    pause()  { getEl()?.pause() },
+    resume() { wanted = true; getEl()?.play().catch(() => {}) },
+    isPlaying() { const a = getEl(); return a ? !a.paused : false },
   }
 }
 
@@ -207,22 +80,12 @@ function chord(ctx, type, notes, gain, stepDuration, noteDuration) {
 }
 
 export function createAudioEngine(ctx) {
-  // Whether the game wants music playing (set by startMusic/stopMusic)
-  let musicWanted = false
-
-  // Music sequencer — created once, lazily
-  let musicSeq = null
-  function getMusicSeq() {
-    if (!musicSeq) musicSeq = createMusicSequencer(ctx)
-    return musicSeq
-  }
+  const music = createMusicPlayer()
 
   function play(fn) {
     if (ctx.state === 'suspended') ctx.resume()
-    // Start music on the first SFX play — guaranteed user-gesture context
-    if (musicWanted && !getMusicSeq().isRunning()) {
-      getMusicSeq().start()
-    }
+    // Start music on first SFX — guaranteed to be inside a user gesture
+    music.tryPlay()
     try { fn() } catch (_) { /* AudioContext blocked or unavailable */ }
   }
 
@@ -302,19 +165,9 @@ export function createAudioEngine(ctx) {
     },
 
     // --- Music controls ---
-    startMusic() {
-      musicWanted = true
-      // Start immediately if context is already running (e.g. after a prior SFX)
-      try { if (ctx.state === 'running') getMusicSeq().start() } catch (_) {}
-    },
-    stopMusic() {
-      musicWanted = false
-      try { getMusicSeq().stop() } catch (_) {}
-    },
-    pauseMusic()  { try { getMusicSeq().pause()  } catch (_) {} },
-    resumeMusic() {
-      musicWanted = true
-      try { getMusicSeq().resume() } catch (_) {}
-    },
+    startMusic()  { music.want();   music.tryPlay() },
+    stopMusic()   { music.unwant() },
+    pauseMusic()  { music.pause()  },
+    resumeMusic() { music.resume() },
   }
 }

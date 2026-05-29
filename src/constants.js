@@ -89,8 +89,5 @@ export const TREAT_HEIGHT = 12
 export const LEVEL_COUNT = 4  // levels before end screen
 
 // --- Audio ---
-export const MUSIC_VOLUME = 0.18         // master gain for background music
-export const MUSIC_TEMPO_BPM = 72        // lazy chiptune tempo
-export const MUSIC_MELODY_GAIN = 0.55    // melody level relative to MUSIC_VOLUME
-export const MUSIC_BASS_GAIN = 0.70      // bass level relative to MUSIC_VOLUME
-export const MUSIC_PERC_GAIN = 0.35      // percussion level relative to MUSIC_VOLUME
+// "Up the Ladder" by Eric Matyas — soundimage.org (royalty-free, attribution required)
+export const MUSIC_VOLUME = 0.35         // background music volume (0–1)
