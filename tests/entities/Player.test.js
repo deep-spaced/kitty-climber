@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { createPlayer, updatePlayer, hurtPlayer, healPlayer, getAttackHitbox } from '../../src/entities/Player.js'
-import { PLAYER_STATES, TILES, TILE_SIZE, MAX_HEALTH, JUMP_CUT_VY, JUMP_BOOST_MAX_TIME } from '../../src/constants.js'
+import { PLAYER_STATES, TILES, TILE_SIZE, MAX_HEALTH, JUMP_CUT_VY, JUMP_BOOST_MAX_TIME, PLAYER_KNOCKBACK_SPEED, PLAYER_KNOCKBACK_UP } from '../../src/constants.js'
 
 // Flat ground map: 1 row ceiling + 8 rows empty + 1 row floor, 20 cols wide
 function makeMap() {
@@ -199,6 +199,25 @@ describe('hurtPlayer', () => {
     p = hurtPlayer(p)
     const again = hurtPlayer(p)
     expect(again.health).toBe(p.health)
+  })
+
+  it('applies knockback velocity in the given direction', () => {
+    const p = createPlayer(100, 100)
+    const hurt = hurtPlayer(p, 1)
+    expect(hurt.vx).toBeCloseTo(PLAYER_KNOCKBACK_SPEED)
+    expect(hurt.vy).toBeCloseTo(-PLAYER_KNOCKBACK_UP)
+  })
+
+  it('applies knockback in the opposite direction when dir is -1', () => {
+    const p = createPlayer(100, 100)
+    const hurt = hurtPlayer(p, -1)
+    expect(hurt.vx).toBeCloseTo(-PLAYER_KNOCKBACK_SPEED)
+  })
+
+  it('zeroes velocity when no knockback direction is given', () => {
+    const p = createPlayer(100, 100)
+    const hurt = hurtPlayer(p)
+    expect(hurt.vx).toBe(0)
   })
 })
 

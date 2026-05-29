@@ -11,6 +11,8 @@ import {
   MAX_HEALTH,
   ATTACK_DURATION,
   HURT_DURATION,
+  PLAYER_KNOCKBACK_SPEED,
+  PLAYER_KNOCKBACK_UP,
 } from '../constants.js'
 import { stepPhysics } from '../engine/physics.js'
 
@@ -142,7 +144,7 @@ export function updatePlayer(player, input, tilemap, dt) {
 /**
  * Apply damage to the player. Returns updated player.
  */
-export function hurtPlayer(player) {
+export function hurtPlayer(player, knockbackDir = 0) {
   if (player.state === PLAYER_STATES.HURT) return player  // already in hurt state
   const health = player.health - 1
   return {
@@ -150,8 +152,8 @@ export function hurtPlayer(player) {
     health,
     state: health > 0 ? PLAYER_STATES.HURT : PLAYER_STATES.IDLE,
     stateTimer: health > 0 ? HURT_DURATION : 0,
-    vx: 0,
-    vy: 0,
+    vx: knockbackDir * PLAYER_KNOCKBACK_SPEED,
+    vy: -PLAYER_KNOCKBACK_UP,
   }
 }
 

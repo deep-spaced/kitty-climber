@@ -30,6 +30,9 @@ function makeCtx() {
     shadowColor: '',
     setLineDash: vi.fn(),
     quadraticCurveTo: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+    transform: vi.fn(),
   }
 }
 

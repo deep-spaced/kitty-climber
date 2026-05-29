@@ -1,8 +1,9 @@
 import { useRef, useCallback } from 'react'
 import { TILE_SIZE, TILES, ENEMY_STATES, CAGE_HEALTH, CAGE_FREED_DELAY, CAGE_HURT_DURATION } from '../constants.js'
+
 import { generateLevel } from '../engine/levelGenerator.js'
 import { createBoard, createRock, updateBoard, updateRock } from '../entities/Obstacle.js'
-import { createEnemy, createBoss, updateEnemy, hurtEnemy } from '../entities/Enemy.js'
+import { createEnemy, createBoss, updateEnemy, hurtEnemy, resetEnemyAttack } from '../entities/Enemy.js'
 import { aabbOverlap } from '../engine/physics.js'
 import { getAttackHitbox } from '../entities/Player.js'
 
@@ -108,9 +109,20 @@ export function useLevel(seed = 1, levelIndex = 0) {
       return moved
     })
 
-    const enemyPlayerHit = enemiesRef.current.some(
+    const hittingEnemy = enemiesRef.current.find(
       (e) => (e.state === ENEMY_STATES.PATROL || e.state === ENEMY_STATES.ATTACK) && aabbOverlap(e, player)
     )
+    const enemyPlayerHit = !!hittingEnemy
+    // Knockback direction: push player away from the enemy's center
+    const enemyHitDir = hittingEnemy
+      ? (player.x + player.width / 2 >= hittingEnemy.x + hittingEnemy.width / 2 ? 1 : -1)
+      : 0
+    // Reset the attacking enemy so it doesn't chain hits
+    if (hittingEnemy) {
+      enemiesRef.current = enemiesRef.current.map((e) =>
+        e === hittingEnemy ? resetEnemyAttack(e) : e
+      )
+    }
 
     // Fish collection
     const collectedFish = []
@@ -166,6 +178,7 @@ export function useLevel(seed = 1, levelIndex = 0) {
       cage,
       playerHit,
       enemyPlayerHit,
+      enemyHitDir,
       killedEnemies,
       collectedFish,
       collectedTreats,

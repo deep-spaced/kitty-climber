@@ -31,44 +31,45 @@ function makeMockAudioCtx() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('useAudio', () => {
-  it('returns a function', () => {
+  it('returns an object with play and music', () => {
     const { result } = renderHook(() => useAudio())
-    expect(typeof result.current).toBe('function')
+    expect(typeof result.current.play).toBe('function')
+    expect(typeof result.current.music).toBe('object')
   })
 
-  it('returns the same function reference on re-render', () => {
+  it('returns the same play reference on re-render', () => {
     const { result, rerender } = renderHook(() => useAudio())
-    const first = result.current
+    const first = result.current.play
     rerender()
-    expect(result.current).toBe(first)
+    expect(result.current.play).toBe(first)
   })
 
   it('calling play with a valid name does not throw', () => {
     const { result } = renderHook(() => useAudio())
-    expect(() => result.current('jump')).not.toThrow()
+    expect(() => result.current.play('jump')).not.toThrow()
   })
 
   it('calling play with an unknown name does not throw', () => {
     const { result } = renderHook(() => useAudio())
-    expect(() => result.current('nonexistent')).not.toThrow()
+    expect(() => result.current.play('nonexistent')).not.toThrow()
   })
 
   it('calling play with no argument does not throw', () => {
     const { result } = renderHook(() => useAudio())
-    expect(() => result.current()).not.toThrow()
+    expect(() => result.current.play()).not.toThrow()
   })
 
   it('calls engine method when AudioContext is available', () => {
     vi.stubGlobal('AudioContext', vi.fn(() => makeMockAudioCtx()))
     const { result } = renderHook(() => useAudio())
-    expect(() => result.current('jump')).not.toThrow()
+    expect(() => result.current.play('jump')).not.toThrow()
     vi.unstubAllGlobals()
   })
 
   it('handles missing sound name gracefully when AudioContext is available', () => {
     vi.stubGlobal('AudioContext', vi.fn(() => makeMockAudioCtx()))
     const { result } = renderHook(() => useAudio())
-    expect(() => result.current('nonexistent')).not.toThrow()
+    expect(() => result.current.play('nonexistent')).not.toThrow()
     vi.unstubAllGlobals()
   })
 })

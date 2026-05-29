@@ -50,8 +50,8 @@ export const HURT_DURATION = 0.5     // seconds
 export const ATTACK_RANGE = 40       // px
 
 export const ENEMY_SPEED = 70        // px per second
-export const ENEMY_WIDTH = 26
-export const ENEMY_HEIGHT = 32
+export const ENEMY_WIDTH = 34
+export const ENEMY_HEIGHT = 20
 export const ENEMY_STATES = {
   PATROL: 'patrol',
   ATTACK: 'attack',
@@ -62,11 +62,15 @@ export const ENEMY_DYING_DURATION = 0.3   // seconds
 export const ENEMY_HURT_DURATION = 0.4   // invincibility after a hit
 export const ENEMY_ATTACK_RANGE = 80     // px — horizontal distance to trigger lunge
 export const ENEMY_ATTACK_DURATION = 0.35 // seconds per lunge cycle
-export const ENEMY_LUNGE_SPEED = 220     // px per second during lunge
+export const ENEMY_LUNGE_SPEED = 130     // px per second during lunge
+export const ENEMY_ATTACK_COOLDOWN = 1.5  // seconds before rat can attack again after hitting
+
+export const PLAYER_KNOCKBACK_SPEED = 180  // px/s horizontal knockback away from enemy
+export const PLAYER_KNOCKBACK_UP = 100     // px/s upward knockback
 export const SCORE_PER_KILL = 10
 
-export const BOSS_ENEMY_WIDTH = 40
-export const BOSS_ENEMY_HEIGHT = 50
+export const BOSS_ENEMY_WIDTH = 52
+export const BOSS_ENEMY_HEIGHT = 28
 export const BOSS_ENEMY_HEALTH = 4
 
 export const CAGE_WIDTH = 48
@@ -83,3 +87,10 @@ export const TREAT_WIDTH = 12
 export const TREAT_HEIGHT = 12
 
 export const LEVEL_COUNT = 4  // levels before end screen
+
+// --- Audio ---
+export const MUSIC_VOLUME = 0.18         // master gain for background music
+export const MUSIC_TEMPO_BPM = 72        // lazy chiptune tempo
+export const MUSIC_MELODY_GAIN = 0.55    // melody level relative to MUSIC_VOLUME
+export const MUSIC_BASS_GAIN = 0.70      // bass level relative to MUSIC_VOLUME
+export const MUSIC_PERC_GAIN = 0.35      // percussion level relative to MUSIC_VOLUME

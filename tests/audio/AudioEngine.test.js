@@ -29,7 +29,7 @@ function makeMockCtx(state = 'running') {
   }
 }
 
-const SOUNDS = ['jump', 'land', 'hurt', 'attack', 'kill', 'collect', 'levelClear', 'gameOver', 'heal', 'cage']
+const SOUNDS = ['jump', 'land', 'hurt', 'attack', 'bite', 'kill', 'collect', 'levelClear', 'gameOver', 'heal', 'cage']
 
 describe('AudioEngine — all sounds play without throwing', () => {
   SOUNDS.forEach((name) => {
@@ -71,6 +71,15 @@ describe('AudioEngine — node creation', () => {
     const engine = createAudioEngine(ctx)
     engine.attack()
     expect(ctx.createBiquadFilter).toHaveBeenCalled()
+  })
+
+  it('bite creates an oscillator and gain node (no filter)', () => {
+    const ctx = makeMockCtx()
+    const engine = createAudioEngine(ctx)
+    engine.bite()
+    expect(ctx.createOscillator).toHaveBeenCalled()
+    expect(ctx.createGain).toHaveBeenCalled()
+    expect(ctx.createBiquadFilter).not.toHaveBeenCalled()
   })
 
   it('collect creates three oscillators (one per note)', () => {

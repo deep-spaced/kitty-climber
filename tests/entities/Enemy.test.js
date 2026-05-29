@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { createEnemy, createBoss, updateEnemy, hurtEnemy } from '../../src/entities/Enemy.js'
+import { createEnemy, createBoss, updateEnemy, hurtEnemy, resetEnemyAttack } from '../../src/entities/Enemy.js'
 import {
   TILES, TILE_SIZE,
   ENEMY_SPEED, ENEMY_WIDTH, ENEMY_HEIGHT,
   ENEMY_STATES, ENEMY_DYING_DURATION, ENEMY_HURT_DURATION,
   BOSS_ENEMY_WIDTH, BOSS_ENEMY_HEIGHT, BOSS_ENEMY_HEALTH,
+  ENEMY_ATTACK_RANGE, ENEMY_ATTACK_DURATION, ENEMY_LUNGE_SPEED, ENEMY_ATTACK_COOLDOWN,
 } from '../../src/constants.js'
 
 // 10×20 map: ceiling row 0, floor row 9, empty in between
@@ -47,6 +48,12 @@ describe('createEnemy', () => {
     expect(e.isBoss).toBe(false)
     expect(e.hurtTimer).toBe(0)
   })
+
+  it('initialises attackTimer and attackCooldown to 0', () => {
+    const e = createEnemy(0, 0)
+    expect(e.attackTimer).toBe(0)
+    expect(e.attackCooldown).toBe(0)
+  })
 })
 
 describe('createBoss', () => {
@@ -60,6 +67,10 @@ describe('createBoss', () => {
 
   it('starts in PATROL state', () => {
     expect(createBoss(0, 0).state).toBe(ENEMY_STATES.PATROL)
+  })
+
+  it('initialises attackCooldown to 0', () => {
+    expect(createBoss(0, 0).attackCooldown).toBe(0)
   })
 })
 
@@ -175,5 +186,89 @@ describe('hurtEnemy', () => {
     const steps = Math.ceil(ENEMY_DYING_DURATION / DT) + 5
     for (let i = 0; i < steps; i++) e = updateEnemy(e, map, DT)
     expect(e.state).toBe(ENEMY_STATES.DEAD)
+  })
+})
+
+describe('updateEnemy — attack state', () => {
+  it('transitions to ATTACK when player is close ahead and cooldown is zero', () => {
+    const map = makeMap()
+    let e = onFloor(map, 5)
+    // Player is one tile ahead in facing direction, same height
+    const playerX = e.x + ENEMY_ATTACK_RANGE - 10
+    const playerY = e.y
+    e = updateEnemy(e, map, DT, playerX, playerY)
+    expect(e.state).toBe(ENEMY_STATES.ATTACK)
+    expect(e.attackTimer).toBeGreaterThan(0)
+  })
+
+  it('does NOT transition to ATTACK when player is behind the enemy', () => {
+    const map = makeMap()
+    let e = onFloor(map, 5)
+    // Player is behind (facing right, player is to the left)
+    const playerX = e.x - 20
+    const playerY = e.y
+    e = updateEnemy(e, map, DT, playerX, playerY)
+    expect(e.state).toBe(ENEMY_STATES.PATROL)
+  })
+
+  it('does NOT transition to ATTACK when attackCooldown is active', () => {
+    const map = makeMap()
+    let e = onFloor(map, 5)
+    e = { ...e, attackCooldown: ENEMY_ATTACK_COOLDOWN }
+    const playerX = e.x + ENEMY_ATTACK_RANGE - 10
+    const playerY = e.y
+    e = updateEnemy(e, map, DT, playerX, playerY)
+    expect(e.state).toBe(ENEMY_STATES.PATROL)
+  })
+
+  it('ticks attackCooldown down each frame', () => {
+    const map = makeMap()
+    let e = onFloor(map, 5)
+    e = { ...e, attackCooldown: ENEMY_ATTACK_COOLDOWN }
+    e = updateEnemy(e, map, DT)
+    expect(e.attackCooldown).toBeLessThan(ENEMY_ATTACK_COOLDOWN)
+  })
+
+  it('lunges at ENEMY_LUNGE_SPEED during ATTACK state', () => {
+    const map = makeMap()
+    let e = onFloor(map, 5)
+    e = { ...e, state: ENEMY_STATES.ATTACK, attackTimer: ENEMY_ATTACK_DURATION }
+    e = updateEnemy(e, map, DT)
+    expect(e.vx).toBeCloseTo(ENEMY_LUNGE_SPEED)
+  })
+
+  it('returns to PATROL and sets attackCooldown when lunge timer expires', () => {
+    const map = makeMap()
+    let e = onFloor(map, 5)
+    e = { ...e, state: ENEMY_STATES.ATTACK, attackTimer: DT * 0.5 }
+    // Run enough frames to drain the timer
+    const steps = Math.ceil(ENEMY_ATTACK_DURATION / DT) + 5
+    for (let i = 0; i < steps; i++) e = updateEnemy(e, map, DT)
+    expect(e.state).toBe(ENEMY_STATES.PATROL)
+    expect(e.attackCooldown).toBeGreaterThan(0)
+  })
+})
+
+describe('resetEnemyAttack', () => {
+  it('returns enemy to PATROL state', () => {
+    const e = { ...createEnemy(100, 200), state: ENEMY_STATES.ATTACK, attackTimer: 0.2 }
+    const reset = resetEnemyAttack(e)
+    expect(reset.state).toBe(ENEMY_STATES.PATROL)
+  })
+
+  it('clears attackTimer', () => {
+    const e = { ...createEnemy(100, 200), state: ENEMY_STATES.ATTACK, attackTimer: 0.2 }
+    expect(resetEnemyAttack(e).attackTimer).toBe(0)
+  })
+
+  it('sets attackCooldown to ENEMY_ATTACK_COOLDOWN', () => {
+    const e = { ...createEnemy(100, 200), state: ENEMY_STATES.ATTACK }
+    expect(resetEnemyAttack(e).attackCooldown).toBe(ENEMY_ATTACK_COOLDOWN)
+  })
+
+  it('restores patrol speed in the facing direction', () => {
+    const e = { ...createEnemy(100, 200), facing: -1, vx: -ENEMY_LUNGE_SPEED }
+    const reset = resetEnemyAttack(e)
+    expect(reset.vx).toBe(-ENEMY_SPEED)
   })
 })

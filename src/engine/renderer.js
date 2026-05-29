@@ -18,7 +18,7 @@ const PLAYER_COLOR = {
   [PLAYER_STATES.FALL]:          '#d09060',
   [PLAYER_STATES.CROUCH]:        '#c07850',
   [PLAYER_STATES.ATTACK_SCRATCH]:'#ff8844',
-  [PLAYER_STATES.ATTACK_BITE]:   '#ff4422',
+  [PLAYER_STATES.ATTACK_BITE]:   '#e8a87c',
   [PLAYER_STATES.HURT]:          '#ff2200',
 }
 
@@ -74,217 +74,278 @@ function drawPlayer(ctx, player, cameraX) {
   const py = Math.round(player.y)
   const { width, height, facing, state } = player
 
+  // Squash-and-stretch: pivot at feet so the cat stays grounded
+  ctx.save()
+  const pivotX = px + width / 2
+  const pivotY = py + height
+  if (state === PLAYER_STATES.RUN) {
+    // Wide and low while running
+    ctx.translate(pivotX, pivotY)
+    ctx.scale(1.30, 0.76)
+    ctx.translate(-pivotX, -pivotY)
+  } else if (state === PLAYER_STATES.JUMP) {
+    // Tall and narrow on the way up
+    ctx.translate(pivotX, pivotY)
+    ctx.scale(0.82, 1.18)
+    ctx.translate(-pivotX, -pivotY)
+  } else if (state === PLAYER_STATES.FALL) {
+    // Slightly stretched while falling
+    ctx.translate(pivotX, pivotY)
+    ctx.scale(0.86, 1.12)
+    ctx.translate(-pivotX, -pivotY)
+  }
+
+  const isLunge = state === PLAYER_STATES.ATTACK_BITE
+  // Whole-body lunge shift — head leads by an extra nudge
+  const lunge = isLunge ? facing * 10 : 0
+  const headExtra = isLunge ? facing * 4 : 0
+  const headDip = isLunge ? 4 : 0
+
   const baseColor = PLAYER_COLOR[state] ?? '#e8a87c'
   const hurt = state === PLAYER_STATES.HURT
   const bodyColor = hurt
     ? (Math.floor(Date.now() / 80) % 2 === 0 ? '#ffffff' : baseColor)
     : baseColor
 
+  // Motion-blur streaks behind the body during lunge
+  if (isLunge) {
+    for (let i = 1; i <= 3; i++) {
+      ctx.fillStyle = `rgba(232,168,124,${0.13 - i * 0.03})`
+      ctx.fillRect(px + lunge - facing * i * 5, py + 8, width, height - 8)
+    }
+  }
+
   const ts = facing === 1 ? -1 : 1
-  const tbx = facing === 1 ? px : px + width
+  // Tail-side back legs — push further back during lunge
+  const tbx = facing === 1 ? px + lunge : px + lunge + width
+  const backLegShift = isLunge ? -facing * 4 : 0
   ctx.fillStyle = bodyColor
-  ctx.fillRect(tbx + ts * 4, py + height - 14, 4, 8)
-  ctx.fillRect(tbx + ts * 7, py + height - 20, 4, 6)
+  ctx.fillRect(tbx + ts * 4 + backLegShift, py + height - 14, 4, 8)
+  ctx.fillRect(tbx + ts * 7 + backLegShift, py + height - 20, 4, 6)
 
+  // Main body — shifted by lunge
   ctx.fillStyle = bodyColor
-  ctx.fillRect(px, py + 8, width, height - 8)
-  ctx.fillRect(px + 2, py + 1, width - 4, 12)
+  ctx.fillRect(px + lunge, py + 8, width, height - 8)
+  // Head block — leads the body by headExtra, dips by headDip
+  ctx.fillRect(px + lunge + headExtra + 2, py + 1 + headDip, width - 4, 12)
 
-  ctx.fillRect(px + 2,         py - 5, 5, 6)
-  ctx.fillRect(px + width - 7, py - 5, 5, 6)
-  ctx.fillRect(px + 3,         py - 8, 3, 3)
-  ctx.fillRect(px + width - 6, py - 8, 3, 3)
+  // Ears (follow head position)
+  ctx.fillRect(px + lunge + headExtra + 2,         py + headDip - 5, 5, 6)
+  ctx.fillRect(px + lunge + headExtra + width - 7, py + headDip - 5, 5, 6)
+  ctx.fillRect(px + lunge + headExtra + 3,         py + headDip - 8, 3, 3)
+  ctx.fillRect(px + lunge + headExtra + width - 6, py + headDip - 8, 3, 3)
   ctx.fillStyle = '#e06090'
-  ctx.fillRect(px + 4,         py - 4, 2, 4)
-  ctx.fillRect(px + width - 6, py - 4, 2, 4)
+  ctx.fillRect(px + lunge + headExtra + 4,         py + headDip - 4, 2, 4)
+  ctx.fillRect(px + lunge + headExtra + width - 6, py + headDip - 4, 2, 4)
 
+  // Eyes (follow head)
   ctx.fillStyle = '#1a1a1a'
-  const eyeX = facing === 1 ? px + width - 10 : px + 5
-  const eyeY = py + 4
-  ctx.fillRect(eyeX, eyeY, 5, 4)
+  const eyeX = facing === 1
+    ? px + lunge + headExtra + width - 10
+    : px + lunge + headExtra + 5
+  const eyeY = py + headDip + 4
+  // Squinted during lunge — half height
+  ctx.fillRect(eyeX, eyeY, 5, isLunge ? 2 : 4)
   ctx.fillStyle = '#fff'
   ctx.fillRect(eyeX + (facing === 1 ? 1 : 3), eyeY, 1, 1)
 
+  // Nose
   ctx.fillStyle = '#e06080'
-  ctx.fillRect(eyeX + (facing === 1 ? -3 : 4), eyeY + 4, 3, 2)
+  ctx.fillRect(eyeX + (facing === 1 ? -3 : 4), eyeY + (isLunge ? 2 : 4), 3, 2)
 
   ctx.fillStyle = 'rgba(0,0,0,0.18)'
-  for (let i = 0; i < 3; i++) ctx.fillRect(px + 4 + i * 7, py + 16, 3, 12)
+  for (let i = 0; i < 3; i++) ctx.fillRect(px + lunge + 4 + i * 7, py + 16, 3, 12)
 
+  // Front legs — reach forward during lunge
+  const frontLegShift = isLunge ? facing * 4 : 0
+  const fbx = facing === 1 ? px + lunge : px + lunge + width
   ctx.fillStyle = bodyColor
   if (state === PLAYER_STATES.RUN) {
     const f = Math.floor(Date.now() / 90) % 2
     const fLen = f === 0 ? 8 : 4
     const bLen = f === 0 ? 4 : 8
-    ctx.fillRect(px + 3,         py + height - fLen, 6, fLen)
-    ctx.fillRect(px + width - 9, py + height - bLen, 6, bLen)
+    ctx.fillRect(px + lunge + 3,         py + height - fLen, 6, fLen)
+    ctx.fillRect(px + lunge + width - 9, py + height - bLen, 6, bLen)
   } else if (state === PLAYER_STATES.JUMP) {
-    ctx.fillRect(px + 3,         py + height - 5, 6, 5)
-    ctx.fillRect(px + width - 9, py + height - 5, 6, 5)
+    ctx.fillRect(px + lunge + 3,         py + height - 5, 6, 5)
+    ctx.fillRect(px + lunge + width - 9, py + height - 5, 6, 5)
   } else if (state === PLAYER_STATES.FALL) {
-    ctx.fillRect(px + 3,         py + height - 9, 5, 9)
-    ctx.fillRect(px + width - 8, py + height - 9, 5, 9)
+    ctx.fillRect(px + lunge + 3,         py + height - 9, 5, 9)
+    ctx.fillRect(px + lunge + width - 8, py + height - 9, 5, 9)
   } else if (state === PLAYER_STATES.CROUCH) {
-    ctx.fillRect(px + 2,          py + height - 4, 8, 4)
-    ctx.fillRect(px + width - 10, py + height - 4, 8, 4)
+    ctx.fillRect(px + lunge + 2,          py + height - 4, 8, 4)
+    ctx.fillRect(px + lunge + width - 10, py + height - 4, 8, 4)
+  } else if (isLunge) {
+    // Front legs: reach forward; back legs: splay behind (already shifted via tbx/backLegShift)
+    const fLegX = facing === 1 ? px + lunge + width - 9 + frontLegShift : px + lunge + 3 + frontLegShift
+    ctx.fillRect(fLegX, py + height - 9, 6, 9)
+    // Second front leg slightly behind
+    const fLeg2X = facing === 1 ? px + lunge + width - 9 : px + lunge + 3
+    ctx.fillRect(fLeg2X - facing * 2, py + height - 7, 5, 7)
   } else {
     ctx.fillRect(px + 3,         py + height - 7, 6, 7)
     ctx.fillRect(px + width - 9, py + height - 7, 6, 7)
   }
 
   if (state === PLAYER_STATES.ATTACK_SCRATCH) {
-    // Wide overhead swipe — three claw arcs fanning upward from the paw
-    const originX = facing === 1 ? px + width : px
-    const originY = py + Math.round(height * 0.35)
-    const arcRadius = 30
-    // Glow behind the arc
-    ctx.fillStyle = 'rgba(255,140,0,0.18)'
+    // Three curved claws fanning forward from the paw
+    // Each claw: thick at root, curves outward, tapers to a sharp tip
+    const rootX = facing === 1 ? px + width - 2 : px + 2
+    const rootY = py + Math.round(height * 0.38)
+    const clawLen = 28
+    // Fan angles relative to straight-forward: top, mid, bottom claw
+    const fanAngles = [-0.55, -0.12, 0.30]
+    const baseAngle = facing === 1 ? 0 : Math.PI
+    // Soft glow under the whole fan
+    ctx.save()
+    ctx.globalAlpha = 0.22
+    ctx.fillStyle = '#ffcc66'
     ctx.beginPath()
-    ctx.arc(originX, originY, arcRadius + 4, -Math.PI * 0.85, -Math.PI * 0.05)
-    if (facing === -1) ctx.arc(originX, originY, arcRadius + 4, -Math.PI * 0.95, -Math.PI * 0.15)
+    ctx.arc(rootX, rootY, clawLen + 6, baseAngle - 0.75, baseAngle + 0.55)
+    ctx.lineTo(rootX, rootY)
+    ctx.closePath()
     ctx.fill()
-    // Three claw lines fanning in a 110-degree arc
-    ctx.strokeStyle = '#ffaa33'
-    ctx.lineWidth = 3
-    const fanDir = facing === 1 ? 0 : Math.PI
-    const angles = [-0.55, 0, 0.55]   // radians offset from forward
-    for (const offset of angles) {
-      const angle = fanDir + offset - Math.PI * 0.5 * (facing === 1 ? -1 : 1)
+    ctx.restore()
+    // Draw each claw as a filled tapered bezier shape
+    for (let i = 0; i < fanAngles.length; i++) {
+      const angle = baseAngle + fanAngles[i]
+      // Tip position — baseAngle already encodes direction, no facing multiplier needed
+      const tipX = rootX + Math.cos(angle) * clawLen
+      const tipY = rootY + Math.sin(angle) * clawLen
+      // Control point — curves the claw outward (hooking shape)
+      const hookAngle = angle + (facing === 1 ? 0.4 : -0.4)
+      const cpX = rootX + Math.cos(hookAngle) * clawLen * 0.6
+      const cpY = rootY + Math.sin(hookAngle) * clawLen * 0.6
+      // Perpendicular offset at root for claw width (tapers to 0 at tip)
+      const perpAngle = angle + Math.PI * 0.5
+      const halfW = 2.5 - i * 0.3
+      const ox = Math.cos(perpAngle) * halfW
+      const oy = Math.sin(perpAngle) * halfW
       ctx.beginPath()
-      ctx.moveTo(originX, originY)
-      ctx.lineTo(
-        originX + Math.cos(angle) * arcRadius * facing,
-        originY + Math.sin(angle) * arcRadius,
-      )
+      ctx.moveTo(rootX + ox, rootY + oy)
+      ctx.quadraticCurveTo(cpX + ox * 0.4, cpY + oy * 0.4, tipX, tipY)
+      ctx.quadraticCurveTo(cpX - ox * 0.4, cpY - oy * 0.4, rootX - ox, rootY - oy)
+      ctx.closePath()
+      // Gradient-like: bright ivory body, white tip implied by shape
+      ctx.fillStyle = i === 1 ? '#f0e0b0' : '#ddd0a0'
+      ctx.fill()
+      ctx.strokeStyle = '#c8a060'
+      ctx.lineWidth = 0.8
       ctx.stroke()
     }
-    // Claw tips — small bright dots at the arc end
-    ctx.fillStyle = '#ffffff'
-    for (const offset of angles) {
-      const angle = fanDir + offset - Math.PI * 0.5 * (facing === 1 ? -1 : 1)
-      ctx.fillRect(
-        Math.round(originX + Math.cos(angle) * arcRadius * facing) - 1,
-        Math.round(originY + Math.sin(angle) * arcRadius) - 1,
-        3, 3,
-      )
-    }
     ctx.lineWidth = 1
-  } else if (state === PLAYER_STATES.ATTACK_BITE) {
-    // Focused forward lunge — elongated jaw snapping at mid-body height
-    const reach = 38
-    const jawY = py + Math.round(height * 0.42)
-    const jawX = facing === 1 ? px + width : px - reach
-    // Dark gum backing
-    ctx.fillStyle = 'rgba(180,20,20,0.28)'
-    ctx.fillRect(jawX, jawY - 6, reach, 16)
-    // Upper jaw — tapered rectangle
-    ctx.fillStyle = '#cc2222'
-    ctx.fillRect(jawX, jawY - 4, reach, 5)
-    // Lower jaw
-    ctx.fillRect(jawX, jawY + 4, reach, 5)
-    // Teeth — alternating white rectangles along both jaws
-    ctx.fillStyle = '#f5f5e0'
-    for (let i = 0; i < 5; i++) {
-      const tx = jawX + 3 + i * 7
-      if (tx + 4 > jawX + reach) break
-      ctx.fillRect(tx, jawY - 3, 4, 4)  // upper tooth
-      ctx.fillRect(tx + 2, jawY + 3, 4, 4)  // lower tooth (offset for interlocking look)
-    }
-    // Saliva drip — single pixel highlight at the tip
-    ctx.fillStyle = 'rgba(255,255,200,0.7)'
-    const tipX = facing === 1 ? jawX + reach - 2 : jawX
-    ctx.fillRect(tipX, jawY + 1, 2, 2)
+  } else if (isLunge) {
+    // Open mouth integrated into the lunged head position
+    // The head leading edge is at the front of (px + lunge + headExtra + head rect)
+    const mouthEdgeX = facing === 1
+      ? px + lunge + headExtra + width - 2
+      : px + lunge + headExtra + 2
+    const mouthY = py + headDip + 7
+    const mouthW = 8
+    // Pink mouth interior
+    ctx.fillStyle = '#cc2244'
+    const mInteriorX = facing === 1 ? mouthEdgeX - mouthW : mouthEdgeX
+    ctx.fillRect(mInteriorX, mouthY - 3, mouthW, 7)
+    // Upper lip / jaw
+    ctx.fillStyle = bodyColor
+    ctx.fillRect(mInteriorX - 1, mouthY - 5, mouthW + 2, 3)
+    // Lower lip / jaw
+    ctx.fillRect(mInteriorX - 1, mouthY + 3, mouthW + 2, 3)
+    // Teeth — two sharp fangs
+    ctx.fillStyle = '#f8f8e8'
+    const fang1X = facing === 1 ? mouthEdgeX - 3 : mouthEdgeX
+    const fang2X = facing === 1 ? mouthEdgeX - 6 : mouthEdgeX + 3
+    ctx.fillRect(fang1X, mouthY - 4, 2, 4)  // upper fang
+    ctx.fillRect(fang2X, mouthY - 4, 2, 3)  // upper fang 2
+    ctx.fillRect(fang1X, mouthY + 2, 2, 4)  // lower fang
+    ctx.fillRect(fang2X, mouthY + 3, 2, 3)  // lower fang 2
   }
+
+  ctx.restore()
 }
 
 function drawSingleEnemy(ctx, enemy, ex, ey) {
   const { width, height, facing, isBoss, health, hurtTimer, state } = enemy
   const flash = (hurtTimer ?? 0) > 0 && Math.floor(Date.now() / 60) % 2 === 0
-  const baseColor = isBoss ? '#7a1a8a' : '#cc44cc'
+  // Boss is darker gray; normal rat is mid-gray
+  const baseColor = isBoss ? '#666666' : '#909090'
   const bodyColor = flash ? '#ffffff' : baseColor
 
+  // Body
   ctx.fillStyle = bodyColor
   ctx.fillRect(ex, ey, width, height)
 
+  // Darker underbelly on lower half
+  ctx.fillStyle = 'rgba(0,0,0,0.15)'
+  ctx.fillRect(ex + 2, ey + Math.round(height * 0.5), width - 4, Math.round(height * 0.5))
+
   // Eyes
-  ctx.fillStyle = '#220022'
-  const eyeOff = isBoss ? 11 : 8
-  const eyeW = isBoss ? 6 : 4
-  const eyeH = isBoss ? 5 : 4
-  const eyeY = ey + Math.round(height * 0.22)
+  const eyeOff = Math.round(width * 0.2)
+  const eyeW = isBoss ? 5 : 3
+  const eyeH = isBoss ? 4 : 3
+  const eyeY = ey + Math.round(height * 0.25)
+  ctx.fillStyle = '#111111'
   if (facing === 1) {
-    ctx.fillRect(ex + width - eyeOff, eyeY, eyeW, eyeH)
+    ctx.fillRect(ex + width - eyeOff - eyeW, eyeY, eyeW, eyeH)
   } else {
-    ctx.fillRect(ex + eyeOff - eyeW, eyeY, eyeW, eyeH)
+    ctx.fillRect(ex + eyeOff, eyeY, eyeW, eyeH)
   }
 
-  // Boss angry eyebrow
+  // Boss-only: angry eyebrow (dark slash above the eye)
   if (isBoss) {
-    ctx.fillStyle = '#440044'
+    ctx.fillStyle = '#333333'
     if (facing === 1) {
-      ctx.fillRect(ex + width - eyeOff - 1, eyeY - 4, eyeW + 2, 2)
+      ctx.fillRect(ex + width - eyeOff - eyeW - 1, eyeY - 3, eyeW + 2, 2)
     } else {
-      ctx.fillRect(ex + eyeOff - eyeW - 1, eyeY - 4, eyeW + 2, 2)
+      ctx.fillRect(ex + eyeOff - 1, eyeY - 3, eyeW + 2, 2)
     }
   }
 
-  // Ears
-  const earW = isBoss ? 7 : 4
-  const earH = isBoss ? 8 : 5
+  // Ears — small round rat ears on top corners
+  const earW = isBoss ? 7 : 5
+  const earH = isBoss ? 5 : 4
   ctx.fillStyle = bodyColor
-  ctx.fillRect(ex + 2,               ey - earH, earW,     earH)
-  ctx.fillRect(ex + width - earW - 2, ey - earH, earW,     earH)
-  ctx.fillStyle = isBoss ? '#ee88ff' : '#ff88ff'
-  ctx.fillRect(ex + 3,               ey - earH + 1, earW - 2, earH - 2)
-  ctx.fillRect(ex + width - earW - 1, ey - earH + 1, earW - 2, earH - 2)
+  ctx.fillRect(ex + 3,               ey - earH, earW, earH)
+  ctx.fillRect(ex + width - earW - 3, ey - earH, earW, earH)
+  ctx.fillStyle = '#c08080'  // pinkish inner ear for all rats
+  ctx.fillRect(ex + 4,               ey - earH + 1, earW - 2, earH - 1)
+  ctx.fillRect(ex + width - earW - 2, ey - earH + 1, earW - 2, earH - 1)
 
-  // Stripes
-  ctx.fillStyle = 'rgba(0,0,0,0.2)'
-  const stripes = isBoss ? 3 : 2
-  for (let i = 0; i < stripes; i++) {
-    ctx.fillRect(ex + 4 + i * 8, ey + Math.round(height * 0.44), 4, isBoss ? 14 : 10)
-  }
+  // Nose
+  const noseX = facing === 1 ? ex + width - 3 : ex + 1
+  ctx.fillStyle = '#d08080'
+  ctx.fillRect(noseX, ey + Math.round(height * 0.45), isBoss ? 4 : 3, 2)
 
-  // Attack animation — lunge pose with claws/teeth and motion streak
+  // Attack animation — lunge with motion streak and red tint
   if (state === ENEMY_STATES.ATTACK) {
-    // Motion-blur streak behind the body
     const streakDir = facing === 1 ? -1 : 1
     for (let i = 1; i <= 3; i++) {
-      ctx.fillStyle = `rgba(204,68,204,${0.12 - i * 0.03})`
-      ctx.fillRect(ex + streakDir * i * 5, ey + 4, width, height - 8)
+      ctx.fillStyle = `rgba(100,100,100,${0.12 - i * 0.03})`
+      ctx.fillRect(ex + streakDir * i * 5, ey + 2, width, height - 4)
     }
-    // Body tint — aggressive bright red-pink over the already-drawn body
-    ctx.fillStyle = flash ? '#ffffff' : '#ff2288'
+    ctx.fillStyle = flash ? '#ffffff' : '#cc2222'
     ctx.fillRect(ex, ey, width, height)
-    // Re-draw stripes on the tinted body
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'
-    const s = isBoss ? 3 : 2
-    for (let i = 0; i < s; i++) {
-      ctx.fillRect(ex + 4 + i * 8, ey + Math.round(height * 0.44), 4, isBoss ? 14 : 10)
-    }
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'
+    ctx.fillRect(ex + 2, ey + Math.round(height * 0.5), width - 4, Math.round(height * 0.5))
     // Claws extending forward
     const clawBaseX = facing === 1 ? ex + width : ex
     const clawY = ey + Math.round(height * 0.5)
     ctx.fillStyle = '#ffffff'
     for (let i = 0; i < 3; i++) {
       const cx = facing === 1 ? clawBaseX + 2 + i * 4 : clawBaseX - 4 - i * 4
-      ctx.fillRect(cx, clawY - 4 + i * 3, 3, 6)
+      ctx.fillRect(cx, clawY - 4 + i * 3, 3, 5)
     }
-    // Angry eyes — bright red
+    // Red eyes
     ctx.fillStyle = '#ff0000'
-    const aEyeOff = isBoss ? 11 : 8
-    const aEyeW  = isBoss ? 6 : 4
-    const aEyeH  = isBoss ? 5 : 4
-    const aEyeY  = ey + Math.round(height * 0.22)
     if (facing === 1) {
-      ctx.fillRect(ex + width - aEyeOff, aEyeY, aEyeW, aEyeH)
+      ctx.fillRect(ex + width - eyeOff - eyeW, eyeY, eyeW, eyeH)
     } else {
-      ctx.fillRect(ex + aEyeOff - aEyeW, aEyeY, aEyeW, aEyeH)
+      ctx.fillRect(ex + eyeOff, eyeY, eyeW, eyeH)
     }
   }
 
-  // Health bar for boss (only while alive/patrolling)
-  if (isBoss && state === ENEMY_STATES.PATROL) {
+  // Health bar for boss
+  if (isBoss && state !== ENEMY_STATES.DYING) {
     const segW = Math.floor(width / BOSS_ENEMY_HEALTH) - 1
     for (let i = 0; i < BOSS_ENEMY_HEALTH; i++) {
       ctx.fillStyle = i < health ? '#ff2244' : '#333'

@@ -46,7 +46,7 @@ const ATTACK_STATES = new Set([PLAYER_STATES.ATTACK_SCRATCH, PLAYER_STATES.ATTAC
 export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, onLevelClear, onGameOver }) {
   const getInput = useInput()
   const { getTilemapWithBoards, tilemap, updateObstacles, levelWidthPx, spawnX, spawnY, roughPatches } = useLevel(seed, levelIndex)
-  const play = useAudio()
+  const { play, music } = useAudio()
 
   const canvasRef    = useRef(null)
   const playerRef    = useRef(createPlayer(spawnX, spawnY))
@@ -64,6 +64,26 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
   const [fishCount, setFishCount] = useState(0)
   const [gameOver, setGameOver]   = useState(false)
   const [levelClear, setLevelClear] = useState(false)
+
+  // Tell the engine music is wanted. It will actually start on the first
+  // SFX play() call, which is always inside a user-gesture (key/tap),
+  // bypassing browser autoplay restrictions reliably.
+  useEffect(() => {
+    music.start()
+    return () => music.stop()
+  }, [music])
+
+  // Pause / resume music with game pause state (no-op once game has ended)
+  useEffect(() => {
+    if (gameOver || levelClear) return
+    if (paused) music.pause()
+    else music.resume()
+  }, [paused, gameOver, levelClear, music])
+
+  // Stop music on game-over or level-clear
+  useEffect(() => {
+    if (gameOver || levelClear) music.stop()
+  }, [gameOver, levelClear, music])
 
   useEffect(() => {
     const handler = (e) => {
@@ -97,14 +117,15 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
       play('land')
       particlesRef.current = [...particlesRef.current, ...emitLand(p.x + p.width / 2, p.y + p.height)]
     }
-    if (ATTACK_STATES.has(p.state) && !ATTACK_STATES.has(prevState)) play('attack')
+    if (p.state === PLAYER_STATES.ATTACK_SCRATCH && prevState !== PLAYER_STATES.ATTACK_SCRATCH) play('attack')
+    if (p.state === PLAYER_STATES.ATTACK_BITE    && prevState !== PLAYER_STATES.ATTACK_BITE)    play('bite')
 
     prevStateRef.current    = p.state
     prevOnGroundRef.current = p.onGround
 
     const {
       boards, rocks, enemies, fish, treats, cage,
-      playerHit, enemyPlayerHit,
+      playerHit, enemyPlayerHit, enemyHitDir,
       killedEnemies, collectedFish, collectedTreats,
       cageDamaged, cageFreed, platformDx,
     } = updateObstacles(p, dt)
@@ -144,7 +165,7 @@ export default function GameScene({ seed = 1, levelIndex = 0, initialScore = 0, 
 
     if (playerHit || enemyPlayerHit) {
       particlesRef.current = [...particlesRef.current, ...emitHit(p.x + p.width / 2, p.y + p.height / 2)]
-      playerRef.current = hurtPlayer(p)
+      playerRef.current = hurtPlayer(p, enemyPlayerHit ? enemyHitDir : 0)
       setHealth(playerRef.current.health)
       if (playerRef.current.health <= 0) {
         play('gameOver')

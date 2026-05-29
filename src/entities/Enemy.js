@@ -1,7 +1,7 @@
 import {
   ENEMY_SPEED, ENEMY_WIDTH, ENEMY_HEIGHT,
   ENEMY_STATES, ENEMY_DYING_DURATION, ENEMY_HURT_DURATION,
-  ENEMY_ATTACK_RANGE, ENEMY_ATTACK_DURATION, ENEMY_LUNGE_SPEED,
+  ENEMY_ATTACK_RANGE, ENEMY_ATTACK_DURATION, ENEMY_LUNGE_SPEED, ENEMY_ATTACK_COOLDOWN,
   BOSS_ENEMY_WIDTH, BOSS_ENEMY_HEIGHT, BOSS_ENEMY_HEALTH,
   TILE_SIZE, TILES, GRAVITY, MAX_FALL_SPEED,
 } from '../constants.js'
@@ -24,6 +24,7 @@ export function createEnemy(x, y) {
     hurtTimer: 0,
     dyingTimer: 0,
     attackTimer: 0,
+    attackCooldown: 0,
   }
 }
 
@@ -41,6 +42,7 @@ export function createBoss(x, y) {
     hurtTimer: 0,
     dyingTimer: 0,
     attackTimer: 0,
+    attackCooldown: 0,
   }
 }
 
@@ -61,15 +63,17 @@ export function updateEnemy(enemy, tilemap, dt, playerX, playerY) {
 
   const rows = tilemap.length
   const cols = tilemap[0].length
-  let { x, y, vx, vy, facing, state, attackTimer } = enemy
+  let { x, y, vx, vy, facing, state, attackTimer, attackCooldown } = enemy
 
   attackTimer = Math.max(0, attackTimer - dt)
+  attackCooldown = Math.max(0, attackCooldown - dt)
 
   // --- Attack state: lunge toward player until timer expires ---
   if (state === ENEMY_STATES.ATTACK) {
     if (attackTimer === 0) {
       // Lunge finished — resume patrol at normal speed toward same direction
       state = ENEMY_STATES.PATROL
+      attackCooldown = ENEMY_ATTACK_COOLDOWN
       vx = facing * ENEMY_SPEED
     } else {
       // Surge forward at lunge speed
@@ -118,6 +122,7 @@ export function updateEnemy(enemy, tilemap, dt, playerX, playerY) {
     if (state === ENEMY_STATES.ATTACK) {
       state = ENEMY_STATES.PATROL
       attackTimer = 0
+      attackCooldown = ENEMY_ATTACK_COOLDOWN
     }
     vx = -vx
     facing = -facing
@@ -125,10 +130,11 @@ export function updateEnemy(enemy, tilemap, dt, playerX, playerY) {
     x = nextX
   }
 
-  // --- Transition to attack when player is close and enemy is patrolling ---
+  // --- Transition to attack when player is close and cooldown has elapsed ---
   if (
     state === ENEMY_STATES.PATROL &&
     hurtTimer === 0 &&
+    attackCooldown === 0 &&
     playerX !== undefined &&
     playerY !== undefined
   ) {
@@ -144,7 +150,17 @@ export function updateEnemy(enemy, tilemap, dt, playerX, playerY) {
     }
   }
 
-  return { ...enemy, x, y, vx, vy, facing, hurtTimer, state, attackTimer }
+  return { ...enemy, x, y, vx, vy, facing, hurtTimer, state, attackTimer, attackCooldown }
+}
+
+export function resetEnemyAttack(enemy) {
+  return {
+    ...enemy,
+    state: ENEMY_STATES.PATROL,
+    attackTimer: 0,
+    attackCooldown: ENEMY_ATTACK_COOLDOWN,
+    vx: enemy.facing * ENEMY_SPEED,
+  }
 }
 
 export function hurtEnemy(enemy) {
