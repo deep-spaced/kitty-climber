@@ -50,14 +50,18 @@ export function generateLevel(seed, { cols = 120, rows = 15, levelIndex = 0 } = 
   const TUNNEL_HEIGHT = 9  // clear tiles between ceiling and floor tiles
   const HALF = Math.floor(TUNNEL_HEIGHT / 2)  // 4
 
+  const minCenter = HALF + 1        // 5 — one tile from top edge
+  const maxCenter = rows - HALF - 2 // 9 — one tile from bottom edge
+
   // --- Tunnel center-line: random walk, then smooth ---
-  let center = Math.floor(rows / 2)
+  // Start center is randomised so the spawn area looks different each seed.
+  let center = minCenter + Math.floor(rand() * (maxCenter - minCenter + 1))
   const rawCenters = [center]
   for (let c = 1; c < cols; c++) {
     const r = rand()
     if (c > 4 && c < cols - 4) {
-      if (r < 0.25) center = Math.max(HALF + 2, center - 1)
-      else if (r < 0.5) center = Math.min(rows - HALF - 3, center + 1)
+      if (r < 0.25) center = Math.max(minCenter, center - 1)
+      else if (r < 0.5) center = Math.min(maxCenter, center + 1)
     }
     rawCenters.push(center)
   }
