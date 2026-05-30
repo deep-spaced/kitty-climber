@@ -6,15 +6,21 @@ import EndScreen from './scenes/EndScreen.jsx'
 import { getHighScore, saveHighScore } from './engine/storage.js'
 import { LEVEL_COUNT } from './constants.js'
 
+const randomSeed = () => Math.floor(Math.random() * 0xFFFFFF) + 1
+
 export default function App() {
   const [scene, setScene]               = useState('title')
   const [levelsCleared, setLevelsCleared] = useState(0)
   const [gameKey, setGameKey]           = useState(0)
   const [highScore, setHighScore]       = useState(() => getHighScore())
   const [finalScore, setFinalScore]     = useState(0)
+  const [baseSeed, setBaseSeed]         = useState(randomSeed)
   const startScoreRef = useRef(0)
 
-  const handleStart = useCallback(() => setScene('map'), [])
+  const handleStart = useCallback(() => {
+    setBaseSeed(randomSeed())
+    setScene('map')
+  }, [])
 
   const handleMapEnter = useCallback(() => {
     setGameKey((k) => k + 1)
@@ -41,6 +47,7 @@ export default function App() {
     saveHighScore(score)
     setHighScore(getHighScore())
     startScoreRef.current = 0
+    setBaseSeed(randomSeed())
     setGameKey((k) => k + 1)
     setScene('map')
   }, [])
@@ -48,6 +55,7 @@ export default function App() {
   const handleReplay = useCallback(() => {
     setLevelsCleared(0)
     startScoreRef.current = 0
+    setBaseSeed(randomSeed())
     setGameKey((k) => k + 1)
     setScene('map')
   }, [])
@@ -73,7 +81,7 @@ export default function App() {
 
   // scene === 'playing': level index and seed are derived from levelsCleared
   const levelIndex = levelsCleared
-  const seed       = 1 + levelIndex * 17
+  const seed       = baseSeed + levelIndex * 17
 
   return (
     <GameScene
